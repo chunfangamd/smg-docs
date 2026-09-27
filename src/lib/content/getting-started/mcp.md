@@ -51,7 +51,7 @@ servers:
 
 - Use `protocol: streamable` for remote servers. The legacy `sse` transport has been removed, and a server configured with it fails to connect.
 - SMG parses `mcp.yaml` as plain YAML and does not expand `${VAR}` placeholders inside server `token` values. Substitute credentials externally before the gateway loads the file: render the YAML through `envsubst` from a shell wrapper, use a templating tool (Helm, Kustomize, Jinja), or inject the final config via a secret mount. See [Keeping Credentials Out of Config Files](../concepts/extensibility/mcp.md#keeping-credentials-out-of-config-files).
-- In v1.11.0 the gateway applies only the `servers` list. It accepts the `pool`, `policy`, `inventory`, and `warmup` sections and a top-level `proxy` section, but does not apply them, so settings such as `pool.call_timeout` and approval policies in this file have no effect. Builds after v1.11.0 apply `pool.max_connections`, `pool.call_timeout`, the top-level `proxy`, and the `policy` section at startup; `pool.idle_timeout`, `inventory`, and `warmup` still have no effect. See [Other Sections](../concepts/extensibility/mcp.md#other-sections).
+- In v1.11.0 the gateway applies only the `servers` list. It accepts the `pool`, `policy`, `inventory`, and `warmup` sections and a top-level `proxy` section, but does not apply them, so settings such as `pool.call_timeout` and approval policies in this file have no effect. Builds of main containing smg-project/smg#2682 apply `pool.max_connections`, `pool.call_timeout`, the top-level `proxy`, and the `policy` section at startup; `pool.idle_timeout`, `inventory`, and `warmup` still have no effect. See [Other Sections](../concepts/extensibility/mcp.md#other-sections).
 
 ---
 
@@ -168,7 +168,7 @@ A tool call that fails does not fail the request: the model gets the error as th
 
 SMG checks every MCP call before running it:
 
-- By default it decides by policy, without asking the client. In v1.11.0 the gateway runs the built-in default policy, which allows every tool; the `policy` section of `mcp.yaml` is not applied. Builds after v1.11.0 apply the `policy` section, and a call it denies fails like any other failed call.
+- By default it decides by policy, without asking the client. In v1.11.0 the gateway runs the built-in default policy, which allows every tool; the `policy` section of `mcp.yaml` is not applied. Builds of main containing smg-project/smg#2682 apply the `policy` section, and a call it denies fails like any other failed call.
 - `require_approval: "always"` on an `mcp` tool pauses before a matching call only in non-streaming requests to an OpenAI-compatible provider. The response ends with an `mcp_approval_request` item instead of running the call, and SMG does not currently resume from an `mcp_approval_response`.
 - On gRPC workers, in streaming requests, and in the Messages API, every call is decided by policy.
 
