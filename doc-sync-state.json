@@ -501,6 +501,14 @@
           "status": "pending"
         }
       ]
+    },
+    "fb365c66bdc3082ea78ad1a77fa34796b6ec2f61": {
+      "plan": {
+        "decision": "documented",
+        "reason": "Every user-facing behavior in this commit is already covered by current docs with concrete passages, verified against current source (model_gateway/src/routers/grpc/multimodal/assemble.rs lines 322-323 still set shm_enabled/shm_min_bytes for vLLM via resolve_mm_shm_enabled, confirming the feature is live). (1) vLLM gRPC SHM tensor transport: src/lib/content/concepts/architecture/multimodal.md \"Tensor Transport\" (lines 295-311) lists inline/shm/auto/rdma modes and the engine matrix marks \"vLLM (gRPC)\" as supporting `shm` and `auto`; src/lib/content/reference/configuration.md line 283 states \"The TokenSpeed and vLLM gRPC paths can use shared memory\" and documents --multimodal-tensor-transport and --multimodal-shm-min-bytes (default 65536). (2) The `auto` shm_namespace_id verification is documented in multimodal.md line 301 (\"its `shm_namespace_id` label (`<boot_id>:<st_dev of /dev/shm>`) must equal SMG's own\") and configuration.md line 289 (\"compares the worker's advertised /dev/shm namespace token from GetServerInfo with its own and falls back to inline on a mismatch\"). (3) Worker-side TOKENSPEED_UNLINK_MM_SHM_AFTER_READ is documented in configuration.md line 294 for \"the vLLM and TokenSpeed gRPC servicers\" with default-on unlink behavior. (4) Metrics generalization to engine \"vllm\": reference/metrics.md lines 530-555 document smg_mm_tensors_total / smg_mm_tensor_bytes_total with runtime label values `vllm, tokenspeed` and path `inline/shm/remote`, plus smg_mm_shm_write_failures_total; the inline fallback on write failure is in multimodal.md line 304. (5) The PD decode-leg drop of multimodal pixels (clear_mm_pixel_values) is documented in multimodal.md line 339: on vLLM \"the decode worker gets each item's identity (content hashes, placeholder ranges, and M-RoPE grid tensors) but not the pixels\". No gaps remain to report.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
