@@ -122,7 +122,7 @@ Runs one tool-call parser over complete model output, the same way the gateway p
 | `tool_call_parser` | string | Registered parser name (required) |
 | `tools` | array | Tool definitions in OpenAI format (required; may be empty). Schema-aware parsers use them to convert argument types |
 
-`tool_call_parser` accepts the 24 registered names: `passthrough`, `json`, `mistral`, `qwen`, `qwen_xml`, `qwen_coder`, `nemotron`, `pythonic`, `llama`, `deepseek`, `deepseek31`, `deepseek32`, `deepseek_v4`, `deepseek_v41`, `glm45_moe`, `glm47_moe`, `step3`, `sarashina`, `kimik2`, `kimi_k3`, `inkling`, `minimax_m2`, `minimax_m3`, `cohere`. The [gRPC Pipeline](../concepts/architecture/grpc-pipeline.md#tool-call-parsers) reference shows each parser's format.
+`tool_call_parser` accepts the 25 registered names: `passthrough`, `json`, `mistral`, `qwen`, `qwen_xml`, `qwen_coder`, `nemotron`, `pythonic`, `llama`, `deepseek`, `deepseek31`, `deepseek32`, `deepseek_v4`, `deepseek_v41`, `glm45_moe`, `glm47_moe`, `step3`, `sarashina`, `kimik2`, `kimi_k3`, `inkling`, `minimax_m2`, `minimax_m3`, `hy_v4`, `cohere`. The [gRPC Pipeline](../concepts/architecture/grpc-pipeline.md#tool-call-parsers) reference shows each parser's format.
 
 If control-plane auth is configured, include an admin bearer token.
 
@@ -175,7 +175,7 @@ curl http://localhost:30000/parse/function_call \
 | `text` | string | Raw model output (required) |
 | `reasoning_parser` | string | Registered parser name (required) |
 
-`reasoning_parser` accepts the 19 registered names: `base`, `passthrough`, `deepseek_r1`, `deepseek_v31`, `deepseek_v4`, `deepseek_v41`, `qwen3`, `qwen3_thinking`, `glm45`, `step3`, `kimi`, `kimi_k25`, `kimi_thinking`, `kimi_k3`, `minimax`, `minimax_m3`, `cohere_cmd`, `nano_v3`, `inkling`.
+`reasoning_parser` accepts the 20 registered names: `base`, `passthrough`, `deepseek_r1`, `deepseek_v31`, `deepseek_v4`, `deepseek_v41`, `qwen3`, `qwen3_thinking`, `glm45`, `step3`, `kimi`, `kimi_k25`, `kimi_thinking`, `kimi_k3`, `minimax`, `minimax_m3`, `hy_v4`, `cohere_cmd`, `nano_v3`, `inkling`.
 
 If control-plane auth is configured, include an admin bearer token.
 
