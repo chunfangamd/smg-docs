@@ -48,7 +48,7 @@ Labels whose values a client can influence are bounded, so unexpected input cann
 
 | Label | Bound |
 |-------|-------|
-| `path` (HTTP metrics) | The matched route template, for example `/v1/responses/{response_id}`. Requests that match no route get a bare `404` from a fallback outside the metrics layer and are not recorded. |
+| `path` (HTTP metrics) | The matched route template, for example `/v1/responses/{response_id}`. Requests that match no route are collapsed into a single `path="other"` series, whatever their URI (smg-project/smg#2679). In v1.11.0 and earlier their `404` came from a fallback outside the metrics layer, so they were not recorded at all. |
 | `method` (HTTP metrics) | `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`; any other method is `OTHER`. |
 | `model` | The first 1,024 distinct values keep their own series; every later new value is reported as `other` (smg-project/smg#2093). |
 | `tool_name` (MCP metrics) | Same rule as `model`: 1,024 distinct values, then `other`. |

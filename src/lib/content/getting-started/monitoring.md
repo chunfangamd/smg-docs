@@ -73,7 +73,7 @@ smg launch \
 | `--enable-trace` | `false` | Enable OpenTelemetry tracing |
 | `--otlp-traces-endpoint` | `localhost:4317` | OTLP gRPC collector endpoint, as `host:port` (`http://` is added when no scheme is given) |
 
-Spans are batched and exported over OTLP gRPC with the service name `smg`. The gateway exports its own request spans: `http_request` for each HTTP request that matches a route (method, URI, request ID, status code, and latency in microseconds) and `grpc_execute` for each dispatch through the gRPC pipeline (request type, request ID, model, and mode).
+Spans are batched and exported over OTLP gRPC with the service name `smg`. The gateway exports its own request spans: `http_request` for each HTTP request on the main listener (method, URI, request ID, status code, and latency in microseconds) and `grpc_execute` for each dispatch through the gRPC pipeline (request type, request ID, model, and mode). Requests to unknown paths get an `http_request` span too; in v1.11.0 and earlier, their `404` came from a fallback outside the span layer, so no span was exported for them (smg-project/smg#2679).
 
 ### Trace propagation
 

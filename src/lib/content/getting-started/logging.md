@@ -129,7 +129,7 @@ The event's own fields (`message` and any structured fields) sit at the top leve
 
 ## Request and Response Logs
 
-Every request that matches a route on the main listener is logged inside an `http_request` span that carries `method`, `uri`, `version`, and `request_id`, plus `status_code` and `latency` (microseconds) once the response is ready:
+Every request on the main listener is logged inside an `http_request` span that carries `method`, `uri`, `version`, and `request_id`, plus `status_code` and `latency` (microseconds) once the response is ready:
 
 | Target | Level | Message | When |
 |--------|-------|---------|------|
@@ -139,7 +139,7 @@ Every request that matches a route on the main listener is logged inside an `htt
 | `smg::response` | ERROR | `request failed with server error` | A 5xx response |
 | `smg::response` | ERROR | `response stream failed after the head was sent` | The response body failed after streaming began |
 
-The logging layer writes one ERROR line per 5xx response; releases before v1.10.0 also logged a duplicate `tower_http` failure line for it (smg-project/smg#2124). A request to an unknown path gets a bare `404` and is not logged.
+The logging layer writes one ERROR line per 5xx response; releases before v1.10.0 also logged a duplicate `tower_http` failure line for it (smg-project/smg#2124). A request to an unknown path gets a `404` from the gateway's fallback and is logged like any other 4xx: an INFO `started processing request` line and a WARN `request failed with client error` line (smg-project/smg#2679). In v1.11.0 and earlier the fallback sat outside the logging layer, so unknown paths were not logged.
 
 ### Health Probe Logs
 
@@ -462,7 +462,7 @@ smg launch \
 
 ### Request ID Propagation
 
-Every request that matches a route gets an ID. SMG takes it from the first of these request headers that is present: `x-request-id`, `x-correlation-id`, `x-trace-id`, `request-id` (replace the list with `--request-id-headers`). Otherwise it generates one with an OpenAI-style prefix (`chatcmpl-`, `cmpl-`, `gnt-`, `resp-`, `msg_`, or `req-`) followed by 24 random letters and digits. The ID is returned in the `x-request-id` response header and recorded as `request_id` on the request's `http_request` span, so it appears on the lines logged while the request is handled, as long as SMG logs at `info` or more verbose.
+Every request on the main listener gets an ID, unknown paths included; in v1.11.0 and earlier, a request to an unknown path got a bare `404` with no `x-request-id` (smg-project/smg#2679). SMG takes it from the first of these request headers that is present: `x-request-id`, `x-correlation-id`, `x-trace-id`, `request-id` (replace the list with `--request-id-headers`). Otherwise it generates one with an OpenAI-style prefix (`chatcmpl-`, `cmpl-`, `gnt-`, `resp-`, `msg_`, or `req-`) followed by 24 random letters and digits. The ID is returned in the `x-request-id` response header and recorded as `request_id` on the request's `http_request` span, so it appears on the lines logged while the request is handled, as long as SMG logs at `info` or more verbose.
 
 ```bash
 # Send request with custom ID
