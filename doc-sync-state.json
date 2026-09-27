@@ -464,6 +464,43 @@
         "concerns": []
       },
       "items": []
+    },
+    "9b64940f28102b94234a6c90e23572c519b17275": {
+      "plan": {
+        "decision": "concerns",
+        "reason": "The commit's flags, env variables, defaults, and transport-mode semantics are already documented on reference/configuration.md and concepts/architecture/multimodal.md. However, three current docs passages state that the per-worker WorkerSpec multimodal transport overrides added by this commit are \"accepted but not applied\" / \"have no effect\", while current source retains them at registration (BasicWorkerBuilder::from_spec on the cloned registration spec) and consults them per request, so the docs claim is stale.",
+        "concerns": [
+          {
+            "slug": "per-worker-multimodal-transport-overrides-effective",
+            "area": "multimodal",
+            "concern": "Per-worker `WorkerSpec.multimodal_tensor_transport` and `multimodal_shm_min_bytes` overrides now take effect: worker registration retains them on the stored worker spec and the gateway resolves them ahead of the router-level flag/env/default for the worker that runs the vision encoder, but the docs state on three pages that registration does not copy them onto the worker so they have no effect, and the configuration precedence line omits the per-worker tier.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs lines 226-246: the registration spec is kept via `let mut spec = config.clone(); ... BasicWorkerBuilder::from_spec(spec.clone())` with a comment explicitly listing \"the HTTP pool and multimodal transport overrides\" as riding along; model_gateway/src/worker/builder.rs line 75 `from_spec` stores the full spec as worker metadata; model_gateway/src/routers/grpc/multimodal/transport.rs lines 333-363 read `metadata().spec.multimodal_tensor_transport` / `.multimodal_shm_min_bytes` from the primary (encode/prefill/single) worker and apply them first in `resolve_mm_shm_enabled` / `resolve_mm_shm_min_bytes`. Contradicted docs passages: reference/configuration.md line 292 (\"v1.11.0 does not copy them onto registered workers, so per-worker values have no effect\") and line 285 precedence omitting the per-worker tier; concepts/architecture/multimodal.md line 304 (\"worker registration does not copy them onto the worker, so they have no effect\"); reference/api/admin.md line 419 lists both fields under the \"Accepted but not applied\" warning.",
+            "title": "docs: per-worker multimodal tensor transport overrides now take effect",
+            "doc_paths": [
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/concepts/architecture/multimodal.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          }
+        ]
+      },
+      "items": [
+        {
+          "concern": {
+            "slug": "per-worker-multimodal-transport-overrides-effective",
+            "area": "multimodal",
+            "concern": "Per-worker `WorkerSpec.multimodal_tensor_transport` and `multimodal_shm_min_bytes` overrides now take effect: worker registration retains them on the stored worker spec and the gateway resolves them ahead of the router-level flag/env/default for the worker that runs the vision encoder, but the docs state on three pages that registration does not copy them onto the worker so they have no effect, and the configuration precedence line omits the per-worker tier.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs lines 226-246: the registration spec is kept via `let mut spec = config.clone(); ... BasicWorkerBuilder::from_spec(spec.clone())` with a comment explicitly listing \"the HTTP pool and multimodal transport overrides\" as riding along; model_gateway/src/worker/builder.rs line 75 `from_spec` stores the full spec as worker metadata; model_gateway/src/routers/grpc/multimodal/transport.rs lines 333-363 read `metadata().spec.multimodal_tensor_transport` / `.multimodal_shm_min_bytes` from the primary (encode/prefill/single) worker and apply them first in `resolve_mm_shm_enabled` / `resolve_mm_shm_min_bytes`. Contradicted docs passages: reference/configuration.md line 292 (\"v1.11.0 does not copy them onto registered workers, so per-worker values have no effect\") and line 285 precedence omitting the per-worker tier; concepts/architecture/multimodal.md line 304 (\"worker registration does not copy them onto the worker, so they have no effect\"); reference/api/admin.md line 419 lists both fields under the \"Accepted but not applied\" warning.",
+            "title": "docs: per-worker multimodal tensor transport overrides now take effect",
+            "doc_paths": [
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/concepts/architecture/multimodal.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
     }
   }
 }
