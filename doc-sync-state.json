@@ -509,6 +509,11 @@
         "concerns": []
       },
       "items": []
+    },
+    "e473b51bce7885cd1b619188bdb6478a16208e3e": {
+      "items": [],
+      "deferred": "Source diff exceeds 100 KB; manual decomposition required",
+      "retry_after": "2026-09-28T14:56:14.643042+00:00"
     }
   }
 }
