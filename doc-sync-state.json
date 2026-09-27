@@ -632,6 +632,216 @@
           "status": "pending"
         }
       ]
+    },
+    "66cb983b48a4df150c61fbd1733a50c243615b2f": {
+      "plan": {
+        "decision": "concerns",
+        "reason": "Commit 66cb983b makes API-created workers keep the full registered WorkerSpec (BasicWorkerBuilder::from_spec) and gives the dedicated kv_role field the same precedence over the legacy label as kv_connector/kv_engine_id. Current docs explicitly document the old behavior (\"accepted but not applied in v1.11.0\") in reference/api/admin.md and in several per-topic pages, so multiple distinct doc corrections are required \u2014 one per user-facing field behavior.",
+        "concerns": [
+          {
+            "slug": "worker-spec-kv-role-field-applied",
+            "area": "admin-api",
+            "title": "docs(admin-api): dedicated kv_role spec field is now applied and wins over the legacy label",
+            "concern": "The top-level `kv_role` field of the worker spec is now applied at registration with the same precedence as `kv_connector` and `kv_engine_id`: a non-empty field wins over a legacy `kv_role` label, and an empty field falls back to the label; previously a `POST /workers` carrying only a top-level `kv_role` lost the role.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:308-333 (take_kv_transfer_metadata now resolves `config.kv_role.clone().filter(|s| !s.is_empty()).or(role_label)`) and the test `dedicated_kv_role_wins_over_the_label`. Current docs contradict this: src/lib/content/reference/api/admin.md:343 says only \"a non-empty `kv_connector` or `kv_engine_id` field wins over the label\", line 417 says \"`kv_role`: set a `kv_role` label instead\", and the PD/KV-transfer field table (lines 404-408) lists `kv_connector` and `kv_engine_id` but no `kv_role` row.",
+            "doc_paths": [
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "worker-spec-pairing-protocol-applied",
+            "area": "pd-disaggregation",
+            "title": "docs(pd): worker spec pairing_protocol field is now kept and used for PD pairing",
+            "concern": "The worker spec's `pairing_protocol` field is now kept on API-registered workers and used as the explicit PD pairing key, instead of requiring a `pairing_protocol` label or `SMG_PAIRING_PROTOCOL` engine environment variable.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec via BasicWorkerBuilder::from_spec (test asserts `spec.pairing_protocol` == \"cluster-blue\"), and model_gateway/src/worker/pd_pairing.rs:89 reads `spec.pairing_protocol` for pairing. Current docs state the opposite: src/lib/content/concepts/routing/pd-disaggregation.md:336 \"The worker spec also has a `pairing_protocol` field, but v1.11.0 does not apply it when it registers the worker; use the label instead\" and src/lib/content/reference/api/admin.md:418 \"`pairing_protocol`: set a `pairing_protocol` label instead\".",
+            "doc_paths": [
+              "src/lib/content/concepts/routing/pd-disaggregation.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "worker-spec-provider-kept-on-worker",
+            "area": "admin-api",
+            "title": "docs(admin-api): worker spec provider field is now kept on the registered worker",
+            "concern": "The worker spec's `provider` field is now kept on API-registered workers and serves as the worker's default provider for model routing, instead of only being validated against compiled provider routers and then dropped.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec (test asserts `spec.provider == Some(ProviderType::OpenAI)` on the built worker), and model_gateway/src/worker/worker.rs:1067-1071 (`default_provider`) and 1098-1104 (`provider_for_model` falls back to `self.spec.provider`) consume it. Current docs state the opposite: src/lib/content/reference/api/admin.md:416 \"`provider`: only checked against the provider routers compiled into the build ...; it is not kept on the worker.\"",
+            "doc_paths": [
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "worker-spec-kv-block-size-applied",
+            "area": "cache-aware-routing",
+            "title": "docs(cache-aware): worker spec kv_block_size is now kept and seeds the KV-event block size",
+            "concern": "The worker spec's `kv_block_size` field is now kept on API-registered workers and read by the KV event monitor to set the block size for event-driven cache-aware routing, instead of being accepted but dropped at registration.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec (test asserts `spec.kv_block_size == Some(64)`), and model_gateway/src/worker/kv_event_monitor.rs:200 reads `worker.metadata().spec.kv_block_size`. Current docs state the opposite: src/lib/content/concepts/routing/cache-aware.md:249 \"The worker spec's `kv_block_size` field is accepted but not applied in v1.11.0\", src/lib/content/getting-started/kv-events-cache-aware.md:188 \"is accepted but not applied in v1.11.0\", and src/lib/content/reference/api/admin.md:421 lists `kv_block_size` under \"Accepted but not applied\".",
+            "doc_paths": [
+              "src/lib/content/concepts/routing/cache-aware.md",
+              "src/lib/content/getting-started/kv-events-cache-aware.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "worker-spec-load-monitor-interval-applied",
+            "area": "overload-protection",
+            "title": "docs(overload): per-worker load_monitor_interval_secs override now takes effect",
+            "concern": "The worker spec's `load_monitor_interval_secs` field is now kept on API-registered workers, and the load monitor polls a worker group at the smallest per-worker interval set in the group, instead of always using the gateway-wide `--load-monitor-interval`.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec (test asserts `spec.load_monitor_interval_secs == Some(3)`), and model_gateway/src/worker/monitor.rs:910-917 \"Uses the smallest `load_monitor_interval_secs` across the group\" via `w.metadata().spec.load_monitor_interval_secs`. Current docs state the opposite: src/lib/content/concepts/reliability/overload-protection.md:106 \"in v1.11.0 worker registration does not copy it onto the worker, so it has no effect\", src/lib/content/reference/configuration.md:270 \"The worker spec's `load_monitor_interval_secs` field is not applied in v1.11.0\", and src/lib/content/reference/api/admin.md:420.",
+            "doc_paths": [
+              "src/lib/content/concepts/reliability/overload-protection.md",
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "worker-spec-multimodal-transport-overrides-applied",
+            "area": "multimodal",
+            "title": "docs(multimodal): per-worker multimodal tensor transport overrides now take effect",
+            "concern": "The worker spec's `multimodal_tensor_transport` and `multimodal_shm_min_bytes` fields are now kept on API-registered workers, so the per-worker overrides that SMG consults for the worker running the vision encoder actually take effect instead of being dropped at registration.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:226-246 retains the spec including \"the multimodal transport overrides\", and model_gateway/src/routers/grpc/multimodal/transport.rs:333-345 reads `metadata().spec.multimodal_tensor_transport` and `spec.multimodal_shm_min_bytes` from the primary worker. Current docs state the opposite: src/lib/content/concepts/architecture/multimodal.md:304 \"in v1.11.0 worker registration does not copy them onto the worker, so they have no effect\", src/lib/content/reference/configuration.md:292 \"v1.11.0 does not copy them onto registered workers, so per-worker values have no effect\", and src/lib/content/reference/api/admin.md:419.",
+            "doc_paths": [
+              "src/lib/content/concepts/architecture/multimodal.md",
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "worker-spec-retry-overrides-applied",
+            "area": "retries",
+            "title": "docs(retries): per-worker resilience retry overrides now create a per-model retry policy",
+            "concern": "The worker spec's `resilience` retry fields (`max_retries`, `initial_backoff_ms`, `max_backoff_ms`, `backoff_multiplier`, `jitter_factor`, `disable_retry`) are now stored on API-registered workers, so registration derives a per-model retry policy from them instead of every request falling back to the gateway-wide `--retry-*` flags.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains `spec.resilience` (test asserts `spec.resilience.max_retries == Some(7)` and `worker.resilience().retry.max_retries == 7`), and model_gateway/src/workflow/steps/shared/register.rs:145-167 creates the per-model retry config from `worker.metadata().spec.resilience` when retry overrides are present. Current docs state the opposite: src/lib/content/concepts/reliability/retries.md:171 \"in v1.11.0 they have no effect. Worker registration leaves them out of the spec it stores on the worker, and a per-model retry policy is only created from retry fields in that stored spec, so none is created\", and src/lib/content/reference/api/admin.md:423.",
+            "doc_paths": [
+              "src/lib/content/concepts/reliability/retries.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          {
+            "slug": "get-workers-echoes-retained-spec",
+            "area": "admin-api",
+            "title": "docs(admin-api): GET /workers now echoes the retained registration spec fields",
+            "concern": "Because API-registered workers now keep the full spec they were registered with, `GET /workers` (which serializes the worker's stored spec) now echoes previously-dropped fields such as the `health`, `http_pool`, and `resilience` blocks and the registered `max_connection_attempts`, contradicting the docs' claims that those blocks are not echoed back and that responses always show the default `20` (`api_key` remains write-only via `skip_serializing`).",
+            "evidence": "crates/protocols/src/worker.rs:912-917 (`WorkerInfo` flattens the worker's `Arc<WorkerSpec>`, \"building a `WorkerInfo` for a response (e.g. `GET /workers`) shares the spec\") combined with model_gateway/src/workflow/steps/local/create_worker.rs:234-246 (workers built via `BasicWorkerBuilder::from_spec(spec.clone())` keep all blocks). Current docs state the opposite: src/lib/content/reference/api/admin.md:410 \"`health`, `http_pool`, and `resilience` take effect but are not echoed back by `GET /workers`; `overload` is\" and line 422 \"responses always show the default `20`\". crates/protocols/src/worker.rs:647-649 keeps `api_key` `skip_serializing`, so that part of the docs stays correct.",
+            "doc_paths": [
+              "src/lib/content/reference/api/admin.md"
+            ]
+          }
+        ]
+      },
+      "items": [
+        {
+          "concern": {
+            "slug": "worker-spec-kv-role-field-applied",
+            "area": "admin-api",
+            "title": "docs(admin-api): dedicated kv_role spec field is now applied and wins over the legacy label",
+            "concern": "The top-level `kv_role` field of the worker spec is now applied at registration with the same precedence as `kv_connector` and `kv_engine_id`: a non-empty field wins over a legacy `kv_role` label, and an empty field falls back to the label; previously a `POST /workers` carrying only a top-level `kv_role` lost the role.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:308-333 (take_kv_transfer_metadata now resolves `config.kv_role.clone().filter(|s| !s.is_empty()).or(role_label)`) and the test `dedicated_kv_role_wins_over_the_label`. Current docs contradict this: src/lib/content/reference/api/admin.md:343 says only \"a non-empty `kv_connector` or `kv_engine_id` field wins over the label\", line 417 says \"`kv_role`: set a `kv_role` label instead\", and the PD/KV-transfer field table (lines 404-408) lists `kv_connector` and `kv_engine_id` but no `kv_role` row.",
+            "doc_paths": [
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "worker-spec-pairing-protocol-applied",
+            "area": "pd-disaggregation",
+            "title": "docs(pd): worker spec pairing_protocol field is now kept and used for PD pairing",
+            "concern": "The worker spec's `pairing_protocol` field is now kept on API-registered workers and used as the explicit PD pairing key, instead of requiring a `pairing_protocol` label or `SMG_PAIRING_PROTOCOL` engine environment variable.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec via BasicWorkerBuilder::from_spec (test asserts `spec.pairing_protocol` == \"cluster-blue\"), and model_gateway/src/worker/pd_pairing.rs:89 reads `spec.pairing_protocol` for pairing. Current docs state the opposite: src/lib/content/concepts/routing/pd-disaggregation.md:336 \"The worker spec also has a `pairing_protocol` field, but v1.11.0 does not apply it when it registers the worker; use the label instead\" and src/lib/content/reference/api/admin.md:418 \"`pairing_protocol`: set a `pairing_protocol` label instead\".",
+            "doc_paths": [
+              "src/lib/content/concepts/routing/pd-disaggregation.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "worker-spec-provider-kept-on-worker",
+            "area": "admin-api",
+            "title": "docs(admin-api): worker spec provider field is now kept on the registered worker",
+            "concern": "The worker spec's `provider` field is now kept on API-registered workers and serves as the worker's default provider for model routing, instead of only being validated against compiled provider routers and then dropped.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec (test asserts `spec.provider == Some(ProviderType::OpenAI)` on the built worker), and model_gateway/src/worker/worker.rs:1067-1071 (`default_provider`) and 1098-1104 (`provider_for_model` falls back to `self.spec.provider`) consume it. Current docs state the opposite: src/lib/content/reference/api/admin.md:416 \"`provider`: only checked against the provider routers compiled into the build ...; it is not kept on the worker.\"",
+            "doc_paths": [
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "worker-spec-kv-block-size-applied",
+            "area": "cache-aware-routing",
+            "title": "docs(cache-aware): worker spec kv_block_size is now kept and seeds the KV-event block size",
+            "concern": "The worker spec's `kv_block_size` field is now kept on API-registered workers and read by the KV event monitor to set the block size for event-driven cache-aware routing, instead of being accepted but dropped at registration.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec (test asserts `spec.kv_block_size == Some(64)`), and model_gateway/src/worker/kv_event_monitor.rs:200 reads `worker.metadata().spec.kv_block_size`. Current docs state the opposite: src/lib/content/concepts/routing/cache-aware.md:249 \"The worker spec's `kv_block_size` field is accepted but not applied in v1.11.0\", src/lib/content/getting-started/kv-events-cache-aware.md:188 \"is accepted but not applied in v1.11.0\", and src/lib/content/reference/api/admin.md:421 lists `kv_block_size` under \"Accepted but not applied\".",
+            "doc_paths": [
+              "src/lib/content/concepts/routing/cache-aware.md",
+              "src/lib/content/getting-started/kv-events-cache-aware.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "worker-spec-load-monitor-interval-applied",
+            "area": "overload-protection",
+            "title": "docs(overload): per-worker load_monitor_interval_secs override now takes effect",
+            "concern": "The worker spec's `load_monitor_interval_secs` field is now kept on API-registered workers, and the load monitor polls a worker group at the smallest per-worker interval set in the group, instead of always using the gateway-wide `--load-monitor-interval`.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains the spec (test asserts `spec.load_monitor_interval_secs == Some(3)`), and model_gateway/src/worker/monitor.rs:910-917 \"Uses the smallest `load_monitor_interval_secs` across the group\" via `w.metadata().spec.load_monitor_interval_secs`. Current docs state the opposite: src/lib/content/concepts/reliability/overload-protection.md:106 \"in v1.11.0 worker registration does not copy it onto the worker, so it has no effect\", src/lib/content/reference/configuration.md:270 \"The worker spec's `load_monitor_interval_secs` field is not applied in v1.11.0\", and src/lib/content/reference/api/admin.md:420.",
+            "doc_paths": [
+              "src/lib/content/concepts/reliability/overload-protection.md",
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "worker-spec-multimodal-transport-overrides-applied",
+            "area": "multimodal",
+            "title": "docs(multimodal): per-worker multimodal tensor transport overrides now take effect",
+            "concern": "The worker spec's `multimodal_tensor_transport` and `multimodal_shm_min_bytes` fields are now kept on API-registered workers, so the per-worker overrides that SMG consults for the worker running the vision encoder actually take effect instead of being dropped at registration.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:226-246 retains the spec including \"the multimodal transport overrides\", and model_gateway/src/routers/grpc/multimodal/transport.rs:333-345 reads `metadata().spec.multimodal_tensor_transport` and `spec.multimodal_shm_min_bytes` from the primary worker. Current docs state the opposite: src/lib/content/concepts/architecture/multimodal.md:304 \"in v1.11.0 worker registration does not copy them onto the worker, so they have no effect\", src/lib/content/reference/configuration.md:292 \"v1.11.0 does not copy them onto registered workers, so per-worker values have no effect\", and src/lib/content/reference/api/admin.md:419.",
+            "doc_paths": [
+              "src/lib/content/concepts/architecture/multimodal.md",
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "worker-spec-retry-overrides-applied",
+            "area": "retries",
+            "title": "docs(retries): per-worker resilience retry overrides now create a per-model retry policy",
+            "concern": "The worker spec's `resilience` retry fields (`max_retries`, `initial_backoff_ms`, `max_backoff_ms`, `backoff_multiplier`, `jitter_factor`, `disable_retry`) are now stored on API-registered workers, so registration derives a per-model retry policy from them instead of every request falling back to the gateway-wide `--retry-*` flags.",
+            "evidence": "model_gateway/src/workflow/steps/local/create_worker.rs:234-246 retains `spec.resilience` (test asserts `spec.resilience.max_retries == Some(7)` and `worker.resilience().retry.max_retries == 7`), and model_gateway/src/workflow/steps/shared/register.rs:145-167 creates the per-model retry config from `worker.metadata().spec.resilience` when retry overrides are present. Current docs state the opposite: src/lib/content/concepts/reliability/retries.md:171 \"in v1.11.0 they have no effect. Worker registration leaves them out of the spec it stores on the worker, and a per-model retry policy is only created from retry fields in that stored spec, so none is created\", and src/lib/content/reference/api/admin.md:423.",
+            "doc_paths": [
+              "src/lib/content/concepts/reliability/retries.md",
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "get-workers-echoes-retained-spec",
+            "area": "admin-api",
+            "title": "docs(admin-api): GET /workers now echoes the retained registration spec fields",
+            "concern": "Because API-registered workers now keep the full spec they were registered with, `GET /workers` (which serializes the worker's stored spec) now echoes previously-dropped fields such as the `health`, `http_pool`, and `resilience` blocks and the registered `max_connection_attempts`, contradicting the docs' claims that those blocks are not echoed back and that responses always show the default `20` (`api_key` remains write-only via `skip_serializing`).",
+            "evidence": "crates/protocols/src/worker.rs:912-917 (`WorkerInfo` flattens the worker's `Arc<WorkerSpec>`, \"building a `WorkerInfo` for a response (e.g. `GET /workers`) shares the spec\") combined with model_gateway/src/workflow/steps/local/create_worker.rs:234-246 (workers built via `BasicWorkerBuilder::from_spec(spec.clone())` keep all blocks). Current docs state the opposite: src/lib/content/reference/api/admin.md:410 \"`health`, `http_pool`, and `resilience` take effect but are not echoed back by `GET /workers`; `overload` is\" and line 422 \"responses always show the default `20`\". crates/protocols/src/worker.rs:647-649 keeps `api_key` `skip_serializing`, so that part of the docs stays correct.",
+            "doc_paths": [
+              "src/lib/content/reference/api/admin.md"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
     }
   }
 }
