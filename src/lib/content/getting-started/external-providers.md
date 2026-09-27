@@ -33,7 +33,7 @@ SMG serves each provider through a provider router. Register a worker with the p
 - **Router by model.** When SMG lists a worker's models at registration (see [Model Discovery](#model-discovery)), it tags each model with a provider from its ID. In [IGW mode](multiple-workers.md#dynamic-workers-with-igw-mode), a request for a `claude*` model goes to the Anthropic router, a `gemini*` model to the Gemini router, and every other model to the OpenAI-compatible router. With `--backend`, the gateway runs the one router you chose.
 - **Upstream key header.** The OpenAI-compatible router picks the header from the worker URL: `x-api-key` plus `anthropic-version: 2023-06-01` for a URL that contains `anthropic`, `x-goog-api-key` for a URL that contains `googleapis.com`, and `Authorization: Bearer` for any other URL. The Anthropic router forwards the caller's own headers (see [API Key Handling](#api-key-handling)), and the Gemini router sends `x-goog-api-key`.
 - **Gemini limits.** In v1.11.0 the Gemini router answers `501` for a streaming request, for a request that carries `previous_interaction_id`, and for a model request with `store` left at its default (`true`), so send `"store": false`.
-- **Build features.** Each provider router is a Cargo feature of the gateway (`provider-openai`, `provider-anthropic`, `provider-gemini`), all in the default build: the pip wheels, the container images, and `cargo install smg` include them. A build without one refuses workers that need it, and `--backend` for it fails at startup.
+- **Build features.** Each provider router is a Cargo feature of the gateway (`provider-openai`, `provider-anthropic`, `provider-gemini`), all in the default build: the pip wheels, the container images, and `cargo install smg` include them. A build without one refuses workers that need it, drops discovered models that need it (see [Model Discovery](#model-discovery)), and `--backend` for it fails at startup.
 
 ---
 
@@ -80,9 +80,16 @@ SMG lists an external worker's models while registering it, when it has a key fo
 
 1. The key is the provider's admin key variable (`OPENAI_ADMIN_KEY`, `XAI_ADMIN_KEY`, `ANTHROPIC_ADMIN_KEY`, or `GEMINI_ADMIN_KEY`, picked from the worker URL's host) if it is set, and otherwise the worker's `api_key`. Workers from `--worker-urls` take their `api_key` from `--api-key`.
 2. SMG calls `GET <url>/v1/models`, sending the key as `x-api-key` for an `anthropic.com` URL and as `Authorization: Bearer` otherwise, and parses an OpenAI-format list (a `data` array of objects with an `id`).
-3. It registers the worker with those models. IDs that differ only by a date suffix (such as `gpt-4o` and `gpt-4o-2024-08-06`) form one model: the shortest ID, with the others as its aliases.
+3. IDs that differ only by a date suffix (such as `gpt-4o` and `gpt-4o-2024-08-06`) form one model: the shortest ID, with the others as its aliases.
+4. It registers the worker with the models whose provider router this build carries. Each model needs the router of the provider its ID implies (see [Router by model](#supported-providers)), or of the worker's provider when the ID implies none.
 
-If the call fails or returns no models, the worker isn't registered. Without any key, SMG registers the worker with no model list. In IGW mode, SMG routes requests to external workers by model, so a worker without a model list receives no traffic there. Under `--backend`, such a worker accepts any model, and callers send their own key.
+The default build carries every provider router, so step 4 keeps every model. A build without a provider feature drops each discovered model that needs it, with a warning naming the feature, and registers the worker with the rest. A proxy listing `gpt-4o` and `claude-3-5-sonnet` on a build without `provider-anthropic` serves `gpt-4o` alone:
+
+```text
+Dropping model claude-3-5-sonnet discovered from https://llm.internal:8443: this build carries no Anthropic router; rebuild with the `provider-anthropic` Cargo feature to serve it
+```
+
+If the call fails, returns no models, or lists only models this build can't route (`every model discovered from ... needs the Anthropic router, which this build does not carry`), the worker isn't registered. Without any key, SMG registers the worker with no model list. In IGW mode, SMG routes requests to external workers by model, so a worker without a model list receives no traffic there. Under `--backend`, such a worker accepts any model, and callers send their own key.
 
 ### `GET /v1/models`
 
