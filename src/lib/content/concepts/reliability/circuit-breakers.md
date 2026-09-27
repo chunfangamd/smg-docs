@@ -384,10 +384,10 @@ Circuit breakers and health checks are independent gates: health checks probe wo
 
 ### Worker Updates
 
-A worker update ([`PATCH /workers/{worker_id}`](../../reference/api/admin.md#update-worker-partial)) rebuilds the worker object, but the breaker carries over. The rebuilt worker keeps the breaker settings resolved at registration — the gateway's `--cb-*` flags plus the worker's `resilience` overrides — and adopts the live breaker itself, so its state and counters survive the update: an open circuit stays open and its timeout keeps running rather than starting over, and `smg_worker_cb_state` keeps reporting the adopted state. A `PATCH` cannot change breaker settings; its body has no `resilience` field.
+On current main, since smg-project/smg#2681, a worker update ([`PATCH /workers/{worker_id}`](../../reference/api/admin.md#update-worker-partial)) rebuilds the worker object, but the breaker carries over. The rebuilt worker keeps the breaker settings resolved at registration — the gateway's `--cb-*` flags plus the worker's `resilience` overrides — and adopts the live breaker itself, so its state and counters survive the update: an open circuit stays open and its timeout keeps running rather than starting over, and `smg_worker_cb_state` keeps reporting the adopted state. A `PATCH` cannot change breaker settings; its body has no `resilience` field.
 
 !!! warning "Changed after v1.11.0"
-    In v1.11.0, a `PATCH` rebuilt the worker on the built-in breaker defaults (open after 5 failures, close after 2 successes, 30-second open timeout) with a closed circuit — silently re-arming a worker the breaker had taken out of rotation, and dropping the gateway flags and `resilience` overrides until a `PUT` re-registered the worker (smg-project/smg#2681). On that release, check `smg_worker_cb_state` after updating a worker.
+    In v1.11.0, a `PATCH` rebuilt the worker on the built-in breaker defaults (open after 5 failures, close after 2 successes, 30-second open timeout). If the previous breaker used different settings, the update discarded its live state and replaced it with a closed breaker, dropping the gateway flags and `resilience` overrides. A breaker already using the built-in defaults could retain its live state, but rebuilding the worker still reset `smg_worker_cb_state` to closed without republishing the adopted state. On that release, the gauge alone can therefore misrepresent the breaker after an update.
 
 ---
 
