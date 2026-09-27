@@ -80,7 +80,7 @@ POST /v1/responses
 | `stream_options` | object | No | Streaming options, such as `include_obfuscation` |
 | `store` | boolean | No | Store response for later retrieval, default: true |
 | `tools` | array | No | Available tools: `function`, `namespace`, `mcp`, and built-in tool types |
-| `tool_choice` | string/object | No | `auto`, `none`, `required`, a function (`{"type": "function", "name": "...", "namespace": "..."}`), `allowed_tools`, an MCP server (`{"type": "mcp", "server_label": "..."}`), or a built-in tool type. Anything except `none` requires `tools`; applies to the first model turn only, see [Tool Choice and the Tool Loop](#tool-choice-and-the-tool-loop) |
+| `tool_choice` | string/object | No | `auto`, `none`, `required`, a function (`{"type": "function", "name": "...", "namespace": "..."}`), `allowed_tools`, an MCP server (`{"type": "mcp", "server_label": "..."}`), or a built-in tool type. Anything except `none` requires `tools`; within SMG’s MCP tool loop, applies to the first model turn only, see [Tool Choice and the Tool Loop](#tool-choice-and-the-tool-loop) |
 | `parallel_tool_calls` | boolean | No | Allow parallel tool execution, default: true when `tools` is set |
 | `previous_response_id` | string | No | Continue from a stored response |
 | `conversation` | string or object | No | Conversation ID (`conv_...`) or `{"id": "conv_..."}`; mutually exclusive with `previous_response_id` |
@@ -232,13 +232,13 @@ forwarded to HTTP workers and external providers.
 
 ### Tool Choice and the Tool Loop
 
-`tool_choice` steers the first model turn only. Once SMG has executed a turn's tool
+In SMG’s MCP tool loop, `tool_choice` steers the first model turn only. Once SMG has executed a turn's tool
 calls, it sends every resumed turn with `tool_choice: "auto"` so the model can answer
 once its results are in; a `required` or named-tool choice does not force further calls
 until the [tool call limit](#tool-call-limits) is hit.
 
-For external OpenAI-compatible providers, SMG rewrites MCP and built-in tools into
-function tools before forwarding. On the first turn, a string `tool_choice` (`auto`,
+When running this loop for external OpenAI-compatible providers, SMG rewrites MCP
+and built-in tools into function tools before forwarding. On the first turn, a string `tool_choice` (`auto`,
 `none`, `required`) passes through, and an object choice is resolved by its `name` (or,
 for a built-in tool, its `type`, such as `image_generation`): when the resolved name
 matches one of the rewritten function tools, SMG forwards
