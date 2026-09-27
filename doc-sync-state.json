@@ -443,6 +443,14 @@
         "concerns": []
       },
       "items": []
+    },
+    "5eea1b73c008b1d8eeeab8c56a395bad539e3875": {
+      "plan": {
+        "decision": "documented",
+        "reason": "The commit exposes EPD (Encode-Prefill-Decode) routing flags in the Python CLI (`--epd-disaggregation`, `--encode`, `--encode-policy`, `--encode-selector`). Current docs already document these flags and use the Python launcher in the EPD examples: concepts/routing/pd-disaggregation.md's EPD section shows an `smg launch --epd-disaggregation --encode ... --prefill ... --decode ...` example with a full flag table including `--encode-policy` (values random/round_robin/consistent_hashing, default consistent_hashing, matching ENCODE_POLICY_CHOICES in router_args.py) and `--encode-selector`; reference/configuration.md documents `--epd-disaggregation` and `--encode-policy` and its \"Python Launcher Differences\" section correctly omits EPD flags from the \"Not available in Python\" list; getting-started/pd-disaggregation.md, concepts/architecture/multimodal.md, concepts/routing/load-balancing.md, and the service-discovery pages cover the same behavior. The docs' claim that an omitted encode bootstrap port defaults to 8998 matches DEFAULT_BOOTSTRAP_PORT in model_gateway/src/worker/worker.rs. The remaining hunk (encoder_servicer.py lazy-import path change) is internal and not user-facing. No correction needed.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
