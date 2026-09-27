@@ -654,6 +654,11 @@ A label that names the same policy as `--policy` gets a per-model instance built
 
 In PD mode, `--prefill-policy` and `--decode-policy` set each leg's policy and default to `--policy`. Both accept `least_load`. `--decode-policy bucket` is rejected at startup, and the Rust binary also rejects `passthrough` on either leg. Outside IGW mode, a leg given `power_of_two` through `--prefill-policy` or `--decode-policy` needs at least two workers on that leg, or startup fails. In EPD mode, `--encode-policy` accepts `random`, `round_robin` or `consistent_hashing` and defaults to `consistent_hashing`. See [PD Disaggregation](pd-disaggregation.md).
 
+Each leg runs its own policy instance, even when it defaults to `--policy`: a `cache_aware` leg keeps prefix trees of that leg's traffic, separate from the main instance's. The gateway hands each leg the same shared inputs it gives the `--policy` instance — the event feed behind the [KV-event index](../../getting-started/kv-events-cache-aware.md), the backend load snapshots that drive the KV-usage triggers and `--overlap-decay` in the [decision flow](cache-aware.md#decision-flow), and the [mesh](cache-aware.md#mesh-state-synchronization) tree bridge — so `cache_aware` routes with the same signals on a leg as under `--policy` (smg-project/smg#2680).
+
+!!! warning "v1.11.0 and earlier"
+    The handover landed after the v1.11.0 release. In v1.11.0 and earlier, the gateway wires those inputs only into policies that already exist, and the legs are set after the wiring, so a `cache_aware` prefill or decode leg misses all three: it routes on its locally built trees even when its workers publish KV events, its KV-usage triggers and `--overlap-decay` never see a load report, and with `--enable-mesh` its trees are not synchronized across gateways. The main `--policy` instance and per-model policies from worker labels are unaffected, and `--encode-policy` cannot name `cache_aware`, so no encode leg is affected.
+
 ---
 
 ## Observability
