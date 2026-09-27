@@ -522,6 +522,116 @@
         "concerns": []
       },
       "items": []
+    },
+    "1adf7f886397b6980c3eabff35e453d998c2f207": {
+      "plan": {
+        "decision": "concerns",
+        "reason": "Commit 1adf7f88 makes the gateway build the MCP orchestrator from the --mcp-config-path file instead of an empty config, so the file's pool, top-level proxy, and policy sections now take effect, and MCP_* proxy environment variables are now read as a global-proxy fallback. Current docs state the opposite in multiple passages (e.g. concepts/extensibility/mcp.md line 275 'In v1.11.0 the gateway reads only the servers list', line 381 'SMG currently ignores the top-level proxy section and the MCP_HTTP_PROXY... variables', reference/configuration.md lines 606 and 1013, getting-started/mcp.md line 54). Four distinct user-facing behaviors need separate corrections; inventory/warmup/pool.idle_timeout remain unapplied, so those parts of the docs are still accurate.",
+        "concerns": [
+          {
+            "slug": "mcp-config-pool-settings-applied",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): pool settings in the MCP config file are now applied",
+            "concern": "The `pool` section of the MCP config file (`pool.call_timeout` and `pool.max_connections`) now takes effect: the orchestrator is built from the operator's file, so a configured call timeout bounds each tool call (previously fixed at 120s) and `max_connections` sizes the dynamic-server pool (previously fixed at 100). Docs currently say the pool section is accepted but not applied and that the 120s timeout 'can't currently be changed'.",
+            "evidence": "model_gateway/src/app_context.rs:675-698 builds the orchestrator via mcp_bootstrap_config(router_config.mcp_config.as_ref()) instead of an empty config; crates/mcp/src/core/orchestrator.rs:325-326 creates the pool with config.pool.max_connections and orchestrator.rs:988-991 applies config.call_timeout() (crates/mcp/src/core/config.rs:627-629, from pool.call_timeout) to every tool call. Contradicts src/lib/content/concepts/extensibility/mcp.md lines 275, 356-358, 367-373, 422, 427 and src/lib/content/getting-started/mcp.md line 54.",
+            "doc_paths": [
+              "src/lib/content/concepts/extensibility/mcp.md",
+              "src/lib/content/getting-started/mcp.md"
+            ]
+          },
+          {
+            "slug": "mcp-config-global-proxy-applied",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): top-level proxy in the MCP config file is now applied",
+            "concern": "The top-level `proxy` section of the MCP config file is now applied as the global MCP proxy: the connection pool is created with the file's proxy config, and each server's own `proxy` block resolves against it. Docs currently say SMG ignores the top-level `proxy` section and advise setting proxies only per server.",
+            "evidence": "model_gateway/src/app_context.rs:679-686 passes the file's config (minus servers) to McpOrchestrator::new; crates/mcp/src/core/orchestrator.rs:325-326 calls McpConnectionPool::with_full_config(config.pool.max_connections, config.proxy.clone()); the mcp_bootstrap_keeps_everything_but_the_server_list test asserts proxy.https survives. Contradicts src/lib/content/concepts/extensibility/mcp.md lines 275, 359, 381, 427 and src/lib/content/reference/configuration.md line 606 ('v1.11.0 ignores the top-level proxy: block').",
+            "doc_paths": [
+              "src/lib/content/concepts/extensibility/mcp.md",
+              "src/lib/content/reference/configuration.md"
+            ]
+          },
+          {
+            "slug": "mcp-config-approval-policy-applied",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): approval policy in the MCP config file is now applied",
+            "concern": "The `policy` section of the MCP config file now builds the orchestrator's policy engine at startup, so `policy.default`, per-server trust levels/defaults, and per-tool rules take effect (for example `policy.default: deny` now denies tool calls). Docs currently say the policy section is accepted but not applied and that an allow-all approval policy is always in effect.",
+            "evidence": "model_gateway/src/app_context.rs:679-688 hands the file's config to McpOrchestrator::new; crates/mcp/src/core/orchestrator.rs:316-322 builds PolicyEngine::from_yaml_config(&config.policy, ...); the app_context test asserts config.policy.default == PolicyDecisionConfig::Deny survives bootstrap. Contradicts src/lib/content/concepts/extensibility/mcp.md lines 275, 362-365, 427 and src/lib/content/getting-started/mcp.md line 54 ('approval policies in this file have no effect').",
+            "doc_paths": [
+              "src/lib/content/concepts/extensibility/mcp.md",
+              "src/lib/content/getting-started/mcp.md"
+            ]
+          },
+          {
+            "slug": "mcp-proxy-env-vars-read",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): MCP proxy environment variables are now read",
+            "concern": "When the MCP config file sets no top-level `proxy`, the gateway now reads `MCP_HTTP_PROXY`, `MCP_HTTPS_PROXY`, and `MCP_NO_PROXY` (falling back to the unprefixed `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`) to populate the global MCP proxy at startup. Docs currently state the MCP-prefixed variables are never read in v1.11.0.",
+            "evidence": "model_gateway/src/app_context.rs:781-785 mcp_bootstrap_config calls config.with_env_proxy(); crates/mcp/src/core/config.rs:596-622 McpProxyConfig::from_env reads MCP_HTTP_PROXY/MCP_HTTPS_PROXY/MCP_NO_PROXY with unprefixed fallbacks, and config.rs:646-651 applies it only when the file's proxy is None; the app_context test mcp_bootstrap_reads_the_proxy_from_the_environment_when_the_file_has_none confirms it. Contradicts src/lib/content/reference/configuration.md lines 606 and 1013 ('MCP_HTTP_PROXY, MCP_HTTPS_PROXY, and MCP_NO_PROXY are not read in v1.11.0') and src/lib/content/concepts/extensibility/mcp.md line 381.",
+            "doc_paths": [
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/concepts/extensibility/mcp.md"
+            ]
+          }
+        ]
+      },
+      "items": [
+        {
+          "concern": {
+            "slug": "mcp-config-pool-settings-applied",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): pool settings in the MCP config file are now applied",
+            "concern": "The `pool` section of the MCP config file (`pool.call_timeout` and `pool.max_connections`) now takes effect: the orchestrator is built from the operator's file, so a configured call timeout bounds each tool call (previously fixed at 120s) and `max_connections` sizes the dynamic-server pool (previously fixed at 100). Docs currently say the pool section is accepted but not applied and that the 120s timeout 'can't currently be changed'.",
+            "evidence": "model_gateway/src/app_context.rs:675-698 builds the orchestrator via mcp_bootstrap_config(router_config.mcp_config.as_ref()) instead of an empty config; crates/mcp/src/core/orchestrator.rs:325-326 creates the pool with config.pool.max_connections and orchestrator.rs:988-991 applies config.call_timeout() (crates/mcp/src/core/config.rs:627-629, from pool.call_timeout) to every tool call. Contradicts src/lib/content/concepts/extensibility/mcp.md lines 275, 356-358, 367-373, 422, 427 and src/lib/content/getting-started/mcp.md line 54.",
+            "doc_paths": [
+              "src/lib/content/concepts/extensibility/mcp.md",
+              "src/lib/content/getting-started/mcp.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "mcp-config-global-proxy-applied",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): top-level proxy in the MCP config file is now applied",
+            "concern": "The top-level `proxy` section of the MCP config file is now applied as the global MCP proxy: the connection pool is created with the file's proxy config, and each server's own `proxy` block resolves against it. Docs currently say SMG ignores the top-level `proxy` section and advise setting proxies only per server.",
+            "evidence": "model_gateway/src/app_context.rs:679-686 passes the file's config (minus servers) to McpOrchestrator::new; crates/mcp/src/core/orchestrator.rs:325-326 calls McpConnectionPool::with_full_config(config.pool.max_connections, config.proxy.clone()); the mcp_bootstrap_keeps_everything_but_the_server_list test asserts proxy.https survives. Contradicts src/lib/content/concepts/extensibility/mcp.md lines 275, 359, 381, 427 and src/lib/content/reference/configuration.md line 606 ('v1.11.0 ignores the top-level proxy: block').",
+            "doc_paths": [
+              "src/lib/content/concepts/extensibility/mcp.md",
+              "src/lib/content/reference/configuration.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "mcp-config-approval-policy-applied",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): approval policy in the MCP config file is now applied",
+            "concern": "The `policy` section of the MCP config file now builds the orchestrator's policy engine at startup, so `policy.default`, per-server trust levels/defaults, and per-tool rules take effect (for example `policy.default: deny` now denies tool calls). Docs currently say the policy section is accepted but not applied and that an allow-all approval policy is always in effect.",
+            "evidence": "model_gateway/src/app_context.rs:679-688 hands the file's config to McpOrchestrator::new; crates/mcp/src/core/orchestrator.rs:316-322 builds PolicyEngine::from_yaml_config(&config.policy, ...); the app_context test asserts config.policy.default == PolicyDecisionConfig::Deny survives bootstrap. Contradicts src/lib/content/concepts/extensibility/mcp.md lines 275, 362-365, 427 and src/lib/content/getting-started/mcp.md line 54 ('approval policies in this file have no effect').",
+            "doc_paths": [
+              "src/lib/content/concepts/extensibility/mcp.md",
+              "src/lib/content/getting-started/mcp.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "mcp-proxy-env-vars-read",
+            "area": "extensibility/mcp",
+            "title": "docs(mcp): MCP proxy environment variables are now read",
+            "concern": "When the MCP config file sets no top-level `proxy`, the gateway now reads `MCP_HTTP_PROXY`, `MCP_HTTPS_PROXY`, and `MCP_NO_PROXY` (falling back to the unprefixed `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`) to populate the global MCP proxy at startup. Docs currently state the MCP-prefixed variables are never read in v1.11.0.",
+            "evidence": "model_gateway/src/app_context.rs:781-785 mcp_bootstrap_config calls config.with_env_proxy(); crates/mcp/src/core/config.rs:596-622 McpProxyConfig::from_env reads MCP_HTTP_PROXY/MCP_HTTPS_PROXY/MCP_NO_PROXY with unprefixed fallbacks, and config.rs:646-651 applies it only when the file's proxy is None; the app_context test mcp_bootstrap_reads_the_proxy_from_the_environment_when_the_file_has_none confirms it. Contradicts src/lib/content/reference/configuration.md lines 606 and 1013 ('MCP_HTTP_PROXY, MCP_HTTPS_PROXY, and MCP_NO_PROXY are not read in v1.11.0') and src/lib/content/concepts/extensibility/mcp.md line 381.",
+            "doc_paths": [
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/concepts/extensibility/mcp.md"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
     }
   }
 }
