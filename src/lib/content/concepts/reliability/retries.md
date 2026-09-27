@@ -128,7 +128,7 @@ SMG retries responses with these status codes. The list is global: per-worker `r
 | `503` | Service Unavailable | Service temporarily down |
 | `504` | Gateway Timeout | Upstream timeout |
 
-SMG's own errors use these codes too. In regular HTTP mode, a failed connection to the worker and an upstream timeout are both a `500`, and in PD mode a transport failure on either leg is a `502`; on the HTTP and gRPC routers, "no available workers" (every candidate unhealthy or circuit-open) is a `503`.
+SMG's own errors use these codes too. In regular HTTP mode, an upstream timeout is a `504` with error code `call_upstream_timeout` and a failed connection to the worker is a `500` (`call_upstream_connection_failed`); before smg-project/smg#2677 the timeout also surfaced as a `500`. In PD mode a transport failure on either leg is a `502`; on the HTTP and gRPC routers, "no available workers" (every candidate unhealthy or circuit-open) is a `503`.
 
 Requests with other status codes (e.g., 400 Bad Request, 401 Unauthorized) are **not retried** because they would likely fail again.
 
