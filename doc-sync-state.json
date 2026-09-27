@@ -456,6 +456,14 @@
       "items": [],
       "deferred": "Source diff exceeds 100 KB; manual decomposition required",
       "retry_after": "2026-09-28T14:52:04.673201+00:00"
+    },
+    "58150cf9a6796c208ec7a64e98fdccc22ec5fec3": {
+      "plan": {
+        "decision": "not_user_facing",
+        "reason": "The commit hoists the ShmHandle and RemoteTensorHandle protobuf message definitions from tokenspeed_scheduler.proto into common.proto and updates internal Rust/Python references accordingly. Verified in current source: crates/grpc_client/proto/common.proto lines 104-117 contain the messages with identical fields and field numbers, and tokenspeed_scheduler.proto line 196 (plus vllm_engine.proto line 113) reference smg.grpc.common.ShmHandle, so the change is current, not reverted, and wire-format compatible (embedded protobuf messages encode only field numbers, which are unchanged). Only generated-code type paths moved, and both the Rust client and Python servicer live in the same repo and were updated together. Verified in current docs: no page mentions ShmHandle, RemoteTensorHandle, TensorData, or tokenspeed_scheduler.proto; the pages describing tensor transport (concepts/architecture/multimodal.md lines 44-74, reference/configuration.md line 283, reference/metrics.md line 539) describe the inline/shared-memory/RDMA behavior conceptually and remain accurate. This is an internal code/proto organization refactor with no user-facing behavior change.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
