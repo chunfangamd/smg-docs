@@ -341,7 +341,7 @@ The `cache_aware` policy keeps an approximate prefix tree per model: a string tr
 2. **Apply**: A peer that already knows that prefix path adds the worker to it in its own tree.
 3. **Repair**: A peer that does not know the path, such as a router that just started, asks a random `ALIVE` peer for its whole tree for that model and tree type and replays it. The tree arrives in pages of up to about 2 MiB; a repair that makes no progress for 5 seconds is retried, preferably with another peer, up to 3 times. Unknown prefixes for the same model and tree type that arrive meanwhile are folded into the repair in flight.
 
-The default policy and per-model cache-aware policies take part, with no flag beyond `--enable-mesh`. In v1.11 the prefill, decode, and encode policies of disaggregated mode do not publish their inserts: the router creates them after the mesh attaches its sync adapter.
+The default policy and per-model cache-aware policies take part, with no flag beyond `--enable-mesh`. In v1.11 the prefill, decode, and encode policies of disaggregated mode do not publish their inserts: the router creates them after the mesh attaches its sync adapter. On the main branch, not yet in a release, setting a leg policy hands it the sync adapter, so cache-aware legs of disaggregated mode publish their inserts like any other cache-aware policy (smg-project/smg#2680).
 
 What consistency to expect:
 
