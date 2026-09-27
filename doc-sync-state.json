@@ -427,6 +427,14 @@
       "items": [],
       "deferred": "Source diff exceeds 100 KB; manual decomposition required",
       "retry_after": "2026-09-28T14:49:50.238850+00:00"
+    },
+    "b1b998980bdf9a080d0ef94676ed3375f74ee9e4": {
+      "plan": {
+        "decision": "not_user_facing",
+        "reason": "The commit only corrects an internal Python import path (KVEventBatch moved from tokenspeed.runtime.disaggregation.kv.kv_events to tokenspeed.runtime.pd.kv_events) in grpc_servicer/smg_grpc_servicer/tokenspeed/servicer.py and adds a regression test asserting the import string. Verified current source (servicer.py line 43) uses the new path, so the fix is live and not reverted. Verified current docs: src/lib/content/getting-started/kv-events-cache-aware.md documents TokenSpeed KV events only at the level of --kv-events-config, ZMQ PUB/SUB, and the SubscribeKvEvents stream; no docs page references tokenspeed.runtime module paths (search returned no matches). No configuration option, API surface, CLI flag, metric, or documented workflow changes \u2014 the fix restores compatibility with an upstream TokenSpeed module rename, an implementation detail invisible to operators.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
