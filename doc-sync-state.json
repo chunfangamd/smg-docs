@@ -435,6 +435,14 @@
         "concerns": []
       },
       "items": []
+    },
+    "0744ea18fdc72c4bf0626b1a722cd8404ba96a76": {
+      "plan": {
+        "decision": "not_user_facing",
+        "reason": "The commit bumps the wasm-encoder crate (0.252 \u2192 0.253) in the [dev-dependencies] section of model_gateway/Cargo.toml (currently line 173, already superseded to \"0.257\" in current source). It is a test-only dependency used to construct WASM binaries for the crate's own tests; it changes no runtime behavior, public API, configuration option, or documented value. Verified current docs: no page mentions wasm-encoder, and the WASM plugins page (src/lib/content/concepts/extensibility/wasm-plugins.md) documents the wasmtime-based plugin runtime, which is unaffected by this dev-dependency version.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
