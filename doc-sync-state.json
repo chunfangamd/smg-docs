@@ -876,6 +876,14 @@
       "items": [],
       "deferred": "Source diff exceeds 100 KB; manual decomposition required",
       "retry_after": "2026-09-29T17:52:17.411373+00:00"
+    },
+    "3df4b8460544d9aea09c1c4c99e44167e9410b21": {
+      "plan": {
+        "decision": "documented",
+        "reason": "The commit is primarily an internal refactor extracting the RDMA pixel transport into crates/mm_rdma (smg-mm-rdma), and all of its user-facing side effects are already covered by current docs that match current source (verified by reading model_gateway/src/routers/grpc/multimodal/transport.rs lines 170-313 and crates/mm_rdma/src/lib.rs). (1) Crate/feature split \u2014 mm-rdma now enables smg-mm-rdma/nixl, default build compiles a no-op stub: contributing/development.md line 146 (\"`mm-rdma` | no | The real NIXL transport for multimodal pixel RDMA; without it the gateway compiles a no-op stub\") and line 210 lists \"crates/mm_rdma/ # smg-mm-rdma: multimodal pixel RDMA (NIXL) transport\"; concepts/architecture/multimodal.md line 317 covers the inert default build. (2) New slot-TTL override guard (resolve_slot_ttl at transport.rs:300 rejects an override \u2264 worker hold with a warning, using derived hold + 30 s): reference/configuration.md line 314 (\"It must exceed the worker's maximum hold (`SMG_RDMA_LANDING_WAIT_S` + `SMG_RDMA_READ_TIMEOUT_S`); a smaller value is ignored with a warning\") and multimodal.md line 320 (\"`--rdma-slot-ttl-s` overrides it only with a value longer than that hold\"). (3) New 8 GiB arena cap (MAX_RDMA_ARENA_BYTES/clamp_pool_slots at transport.rs:178,256): reference/configuration.md line 322 (\"The arena (slots \u00d7 bytes) is capped at 8 GiB by reducing the slot count\"). (4) Missing listen IP keeps the lane inline (mm_rdma_exporter at transport.rs:198): reference/configuration.md line 313 (\"Without one, the lane stays on the inline path\") and multimodal.md line 318. Remaining diffs (FIFO vs LIFO slot reuse, saturating_duration_since, reaper spawn-failure propagation, room\u2192slot_key rename) are internal mechanics with no operator-visible contract.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
