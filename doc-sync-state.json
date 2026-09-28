@@ -892,6 +892,14 @@
         "concerns": []
       },
       "items": []
+    },
+    "9fa900b164a5423d4f46b06cc209df274a8de287": {
+      "plan": {
+        "decision": "not_user_facing",
+        "reason": "Pure internal refactor: audio-processor selection moved from a string-keyed AudioProcessorRegistry (deleted from crates/multimodal/src/audio/processor.rs) onto the ModelProcessorSpec trait. Verified in current source: crates/multimodal/src/registry/traits.rs lines 260-275 define fn audio_processor with a None default (\"no separate string-keyed registry to keep in sync\"), implemented by qwen3_asr.rs, qwen3_omni.rs, and (added later) inkling.rs, and AudioProcessorRegistry no longer exists anywhere in the tree. The same model families build the same Qwen3AudioProcessor::from_configs(...) from the same model/preprocessor configs, and the caller in model_gateway/src/routers/grpc/multimodal/process.rs raises the same \"No audio processor registered for model spec\" error for unsupported models. No configuration options, API surface, supported-model set, or observable behavior changed. Current docs describe audio support only at the user level and remain accurate \u2014 e.g. src/lib/content/concepts/architecture/multimodal.md line 177 (\"Audio (`audio_url`, `input_audio`) is accepted for Qwen3-Omni, Qwen3-ASR, and Inkling, on TokenSpeed workers only\") and reference/api/openai.md line 481 \u2014 and no doc references the removed internal registry.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
