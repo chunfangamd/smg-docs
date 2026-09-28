@@ -842,6 +842,14 @@
           "status": "pending"
         }
       ]
+    },
+    "377981aaf3a23beb61cb8b54ac588152b9db097c": {
+      "plan": {
+        "decision": "documented",
+        "reason": "The commit removes the legacy `smg server` subcommand and the `smg.launch_server` module from the Python bindings. Verified current source: bindings/python/src/smg/cli.py (line 69) accepts only `launch` and `serve` subcommands, with no `server` parser registered. Verified current docs: a search for \"smg server\" across all docs returns zero matches \u2014 the removed subcommand was never documented. The docs affirmatively describe the current post-removal CLI surface: src/lib/content/reference/configuration.md line 814 states \"the Python `smg` needs a subcommand (`launch` or `serve`); there is no `start` alias and no subcommand-less form\", and src/lib/content/getting-started/index.md line 41 documents `smg launch` and `smg serve` as the only entry points. The `python -m sglang.launch_server` snippets found in docs refer to the SGLang engine's own launcher, not the removed smg module. Docs already match current behavior; no correction is required.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
