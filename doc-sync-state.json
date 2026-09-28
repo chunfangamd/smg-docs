@@ -884,6 +884,14 @@
         "concerns": []
       },
       "items": []
+    },
+    "1d333926a39704d9b43a3a247ef8848f0bae1421": {
+      "plan": {
+        "decision": "documented",
+        "reason": "All user-facing behaviors in this commit are already covered by current docs with concrete passages: (1) the image/video input byte caps and their env vars are documented in reference/configuration.md lines 334-336 (\"SMG_IMAGE_MAX_INPUT_BYTES | 268435456 (256 MiB) | Byte cap for one image input.\" etc.) and in concepts/architecture/multimodal.md lines 245-247 (\"Encoded image | 256 MiB | SMG_IMAGE_MAX_INPUT_BYTES\", \"Encoded video | 256 MiB | SMG_VIDEO_MAX_INPUT_BYTES\"); (2) the 4096-byte ASR prompt cap is documented in reference/api/openai.md line 496 (\"A prompt over 4096 bytes | 400 asr_prompt_too_long\"), matching MAX_PROMPT_BYTES=4096 in crates/multimodal/src/registry/qwen3_asr.rs; (3) the expanded Qwen3-ASR label detection is covered by openai.md lines 484-485 (\"a serving worker's model ID or model-identity label, contains qwen3-asr or qwen3_asr\"). The Qwen3-VL video pixel-budget and Qwen3-audio hop-length changes are preprocessing-fidelity corrections to match the HF reference; docs state frame size is \"Set by the model's processor\" (multimodal.md line 214) and route preprocessing failures through the documented generic error codes (multimodal.md lines 267-269), so no published passage is contradicted. The ci_install_vllm.sh change is CI-only and not user-facing.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
