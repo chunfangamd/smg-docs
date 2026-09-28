@@ -908,6 +908,114 @@
         "concerns": []
       },
       "items": []
+    },
+    "0a58a6c33ac6311e822d67068c6845678eb6e7ac": {
+      "plan": {
+        "decision": "concerns",
+        "reason": "Commit 0a58a6c is present in current source: the 404 fallback is now registered before the edge middleware stack, so requests to unknown routes cross the logging, metrics, request-id and CORS layers. Current docs explicitly state the opposite for logging and request IDs, and omit the new metrics/CORS coverage. Four independent user-facing behaviors need separate doc updates.",
+        "concerns": [
+          {
+            "slug": "unknown-routes-access-logging",
+            "area": "logging",
+            "title": "docs(logging): unknown routes are now access-logged like matched routes",
+            "concern": "Requests to unknown paths now pass through the access-logging layer, so a 404 to an unregistered route produces the standard `http_request` span and request/response log lines (and the corresponding OTEL span when tracing is enabled), instead of returning a bare 404 with no log line.",
+            "evidence": "model_gateway/src/server.rs:1077-1082 registers `app.fallback(sink_handler)` before `.layer(middleware::create_logging_layer())`, with the doc comment at lines 1060-1066 stating unknown routes previously ran outside all edge layers ('no log line'). Current docs contradict this: src/lib/content/getting-started/logging.md:142 says 'A request to an unknown path gets a bare `404` and is not logged', logging.md:132 says 'Every request that matches a route on the main listener is logged inside an `http_request` span', and src/lib/content/getting-started/monitoring.md:76 says spans are exported 'for each HTTP request that matches a route'.",
+            "doc_paths": [
+              "src/lib/content/getting-started/logging.md",
+              "src/lib/content/getting-started/monitoring.md"
+            ]
+          },
+          {
+            "slug": "unknown-routes-request-id",
+            "area": "logging",
+            "title": "docs(logging): 404 responses for unknown routes now carry x-request-id",
+            "concern": "Requests to unknown paths now pass through the request-ID layer, so a 404 response for an unregistered route receives (or propagates) a request ID and returns it in the `x-request-id` response header, the same as matched routes.",
+            "evidence": "model_gateway/src/server.rs:1077-1084 places `.layer(middleware::RequestIdLayer::new(request_id_headers))` after the fallback registration, and the test `unknown_routes_cross_the_edge_middleware` (server.rs ~1763-1790) asserts `/nope` returns 404 with an `x-request-id` header. Current docs say the opposite: src/lib/content/getting-started/logging.md:465 states 'Every request that matches a route gets an ID.'",
+            "doc_paths": [
+              "src/lib/content/getting-started/logging.md"
+            ]
+          },
+          {
+            "slug": "unknown-routes-http-metrics-other-label",
+            "area": "metrics",
+            "title": "docs(metrics): unmatched requests now counted in HTTP metrics under path=\"other\"",
+            "concern": "Requests to unknown paths now pass through the HTTP metrics layer, so they are counted in `smg_http_requests_total`, `smg_http_request_duration_seconds`, response counters and the in-flight tracking, with the `path` label set to `other` (the label the layer uses for unmatched routes); previously they produced no metrics at all.",
+            "evidence": "model_gateway/src/server.rs:1077-1083 places `.layer(middleware::HttpMetricsLayer::new(inflight_tracker))` after the fallback; model_gateway/src/middleware/metrics.rs:5-6 documents 'The path label is the matched axum route template (or \"other\" when unmatched)'. Current docs (src/lib/content/reference/metrics.md:118-136, `smg_http_requests_total` labels `method`, `path`; src/lib/content/getting-started/monitoring.md:158) never mention the `other` path label or that unmatched requests are now counted.",
+            "doc_paths": [
+              "src/lib/content/reference/metrics.md",
+              "src/lib/content/getting-started/monitoring.md"
+            ]
+          },
+          {
+            "slug": "unknown-routes-cors-headers",
+            "area": "server",
+            "title": "docs(reference): CORS headers are now applied to responses for unknown routes",
+            "concern": "Requests to unknown paths now pass through the CORS layer, so 404 responses for unregistered routes carry the configured CORS headers (and preflight handling applies), where previously unknown routes returned no CORS headers at all.",
+            "evidence": "model_gateway/src/server.rs:1077-1085 places `.layer(create_cors_layer(cors_allowed_origins))` after `app.fallback(sink_handler)`, and the function comment at lines 1060-1066 states unknown routes previously got 'no CORS headers'. Current docs describing CORS behavior (src/lib/content/reference/configuration.md:443 `--cors-allowed-origins`; src/lib/content/reference/api/messages.md:51) do not note that unmatched routes are covered.",
+            "doc_paths": [
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/reference/api/messages.md"
+            ]
+          }
+        ]
+      },
+      "items": [
+        {
+          "concern": {
+            "slug": "unknown-routes-access-logging",
+            "area": "logging",
+            "title": "docs(logging): unknown routes are now access-logged like matched routes",
+            "concern": "Requests to unknown paths now pass through the access-logging layer, so a 404 to an unregistered route produces the standard `http_request` span and request/response log lines (and the corresponding OTEL span when tracing is enabled), instead of returning a bare 404 with no log line.",
+            "evidence": "model_gateway/src/server.rs:1077-1082 registers `app.fallback(sink_handler)` before `.layer(middleware::create_logging_layer())`, with the doc comment at lines 1060-1066 stating unknown routes previously ran outside all edge layers ('no log line'). Current docs contradict this: src/lib/content/getting-started/logging.md:142 says 'A request to an unknown path gets a bare `404` and is not logged', logging.md:132 says 'Every request that matches a route on the main listener is logged inside an `http_request` span', and src/lib/content/getting-started/monitoring.md:76 says spans are exported 'for each HTTP request that matches a route'.",
+            "doc_paths": [
+              "src/lib/content/getting-started/logging.md",
+              "src/lib/content/getting-started/monitoring.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "unknown-routes-request-id",
+            "area": "logging",
+            "title": "docs(logging): 404 responses for unknown routes now carry x-request-id",
+            "concern": "Requests to unknown paths now pass through the request-ID layer, so a 404 response for an unregistered route receives (or propagates) a request ID and returns it in the `x-request-id` response header, the same as matched routes.",
+            "evidence": "model_gateway/src/server.rs:1077-1084 places `.layer(middleware::RequestIdLayer::new(request_id_headers))` after the fallback registration, and the test `unknown_routes_cross_the_edge_middleware` (server.rs ~1763-1790) asserts `/nope` returns 404 with an `x-request-id` header. Current docs say the opposite: src/lib/content/getting-started/logging.md:465 states 'Every request that matches a route gets an ID.'",
+            "doc_paths": [
+              "src/lib/content/getting-started/logging.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "unknown-routes-http-metrics-other-label",
+            "area": "metrics",
+            "title": "docs(metrics): unmatched requests now counted in HTTP metrics under path=\"other\"",
+            "concern": "Requests to unknown paths now pass through the HTTP metrics layer, so they are counted in `smg_http_requests_total`, `smg_http_request_duration_seconds`, response counters and the in-flight tracking, with the `path` label set to `other` (the label the layer uses for unmatched routes); previously they produced no metrics at all.",
+            "evidence": "model_gateway/src/server.rs:1077-1083 places `.layer(middleware::HttpMetricsLayer::new(inflight_tracker))` after the fallback; model_gateway/src/middleware/metrics.rs:5-6 documents 'The path label is the matched axum route template (or \"other\" when unmatched)'. Current docs (src/lib/content/reference/metrics.md:118-136, `smg_http_requests_total` labels `method`, `path`; src/lib/content/getting-started/monitoring.md:158) never mention the `other` path label or that unmatched requests are now counted.",
+            "doc_paths": [
+              "src/lib/content/reference/metrics.md",
+              "src/lib/content/getting-started/monitoring.md"
+            ]
+          },
+          "status": "pending"
+        },
+        {
+          "concern": {
+            "slug": "unknown-routes-cors-headers",
+            "area": "server",
+            "title": "docs(reference): CORS headers are now applied to responses for unknown routes",
+            "concern": "Requests to unknown paths now pass through the CORS layer, so 404 responses for unregistered routes carry the configured CORS headers (and preflight handling applies), where previously unknown routes returned no CORS headers at all.",
+            "evidence": "model_gateway/src/server.rs:1077-1085 places `.layer(create_cors_layer(cors_allowed_origins))` after `app.fallback(sink_handler)`, and the function comment at lines 1060-1066 states unknown routes previously got 'no CORS headers'. Current docs describing CORS behavior (src/lib/content/reference/configuration.md:443 `--cors-allowed-origins`; src/lib/content/reference/api/messages.md:51) do not note that unmatched routes are covered.",
+            "doc_paths": [
+              "src/lib/content/reference/configuration.md",
+              "src/lib/content/reference/api/messages.md"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
     }
   }
 }
