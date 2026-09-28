@@ -900,6 +900,14 @@
         "concerns": []
       },
       "items": []
+    },
+    "fe37ff1a407db6e7ca88c02a7580e8063c903b71": {
+      "plan": {
+        "decision": "documented",
+        "reason": "The commit's user-facing behavior \u2014 rejecting unsupported (engine, modality) combinations early at worker selection with 400 `multimodal_not_supported`, per a fixed backend\u00d7modality capability matrix \u2014 is fully covered by the current multimodal concepts page. The \"Engine Support\" table in src/lib/content/concepts/architecture/multimodal.md (lines 181\u2013187) matches capability.rs exactly (vLLM: images+video; TokenSpeed: images+video+audio; SGLang: images; TensorRT-LLM: images; MLX: none); line 189 states \"A modality the selected engine does not take is refused with 400 `multimodal_not_supported`\"; Request Flow step 6 (line 73) documents that the refusal happens at worker selection (\"Select a worker. The request is refused if the selected engine does not accept one of its modalities.\"); and the Errors table (line 270) lists 400 `multimodal_not_supported` with the cause \"The selected engine does not take the modality\". The remaining diff content (defense-in-depth assertion in assemble.rs, GrpcClient::runtime_type() helper, helper extraction, tests) is internal refactoring with no further observable change. Verified the change is still present in current source (capability.rs matrix at lines 52\u201360; worker_selection.rs bad_request \"multimodal_not_supported\" at line 246).",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
