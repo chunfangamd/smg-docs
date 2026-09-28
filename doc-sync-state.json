@@ -855,6 +855,14 @@
       "items": [],
       "deferred": "Concern list and audit decision disagree",
       "retry_after": "2026-09-29T17:50:33.587677+00:00"
+    },
+    "cdcb3f8e84182472100c06066f36f326a1ecea70": {
+      "plan": {
+        "decision": "not_user_facing",
+        "reason": "The commit only edits scripts/k8s-runner-resources/agentic-services.yaml, an internal CI resource manifest for the project's GitHub Actions agentic runner pods (namespace actions-runner-system; the file's own header describes it as \"Standalone services for agentic runner pods\"). The changes fully qualify container image references with docker.io/ and replace initialDelaySeconds with a startupProbe on the Oracle test database used by CI. This does not touch product code, configuration, or any shipped deployment artifact. Searches of the current docs found no references to agentic-services, brave-search, or this runner manifest, and the contributing/development.md page covers local development and CI checks without documenting runner-pod infrastructure. No documentation change is warranted.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
