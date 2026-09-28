@@ -863,6 +863,14 @@
         "concerns": []
       },
       "items": []
+    },
+    "517eb3221b1c664740fe4582ba03ffb47d14b89f": {
+      "plan": {
+        "decision": "not_user_facing",
+        "reason": "The commit adds LoadLoRAAdapter/UnloadLoRAAdapter/ListLoadedLoRAAdapters RPCs to the internal SGLang scheduler proto (verified live in current source at crates/grpc_client/proto/sglang_scheduler.proto lines 49-60), plus regenerated Go bindings in a Go-internal package (bindings/golang/internal/proto, unimportable externally) and a smg-grpc-proto package version bump. Verified against current source: no router/gateway code invokes these RPCs \u2014 searches for LoadLoRAAdapter, ListLoadedLoRAAdapters, load_lora, and lora_adapter match only the proto file and generated bindings \u2014 so no HTTP endpoint, admin operation, CLI flag, or documented SMG behavior changes. Verified against current docs: no page enumerates SglangScheduler RPC methods (the only service mention is the generic --smg-grpc-mode note in getting-started/kv-events-cache-aware.md line 80), and the sole LoRA-management docs claim (getting-started/zmq-workers.md line 367: LoRA loading unavailable over ZMQ) remains accurate. Documenting these RPCs now would describe an internal engine-to-gateway wire contract with no user-reachable behavior, which would be speculative.",
+        "concerns": []
+      },
+      "items": []
     }
   }
 }
