@@ -1016,6 +1016,41 @@
           "status": "pending"
         }
       ]
+    },
+    "c6cbd02a4eccbea0f52deb1fdef36e3946ebbf55": {
+      "plan": {
+        "decision": "concerns",
+        "reason": "The commit's fix is present in current source: convert_reqwest_error in model_gateway/src/routers/http/router.rs now consults is_timeout() before the generic request/body arms, so an HTTP-path upstream timeout returns 504 with code call_upstream_timeout (connection failures stay 500 call_upstream_connection_failed). The current docs still assert the pre-fix behavior: retries.md says an upstream timeout in regular HTTP mode is a 500, and the openai.md error-code table lacks the 504/call_upstream_timeout entry.",
+        "concerns": [
+          {
+            "slug": "http-upstream-timeout-504",
+            "area": "reliability",
+            "title": "docs(reliability): HTTP-path upstream timeouts now return 504, not 500",
+            "concern": "On the regular HTTP router path, a request to a worker that times out now returns HTTP 504 Gateway Timeout with error code call_upstream_timeout (including a client total-timeout expiring while a non-streaming body is read), instead of the previous 500; failed connections still return 500 with call_upstream_connection_failed.",
+            "evidence": "model_gateway/src/routers/http/router.rs lines 1639-1655: convert_reqwest_error checks `e.is_timeout()` -> `(StatusCode::GATEWAY_TIMEOUT, \"call_upstream_timeout\")` and `e.is_connect()` -> 500 `call_upstream_connection_failed` before the generic is_request()/is_body() 500 arms; tests upstream_timeout_is_a_gateway_timeout (lines ~3379-3407) assert 504 and the call_upstream_timeout header. Stale doc passage: src/lib/content/concepts/reliability/retries.md line 131 says \"In regular HTTP mode, a failed connection to the worker and an upstream timeout are both a `500`\"; the Error Codes table in src/lib/content/reference/api/openai.md (lines 666-683) has no 504 row for the HTTP-path call_upstream_timeout code.",
+            "doc_paths": [
+              "src/lib/content/concepts/reliability/retries.md",
+              "src/lib/content/reference/api/openai.md"
+            ]
+          }
+        ]
+      },
+      "items": [
+        {
+          "concern": {
+            "slug": "http-upstream-timeout-504",
+            "area": "reliability",
+            "title": "docs(reliability): HTTP-path upstream timeouts now return 504, not 500",
+            "concern": "On the regular HTTP router path, a request to a worker that times out now returns HTTP 504 Gateway Timeout with error code call_upstream_timeout (including a client total-timeout expiring while a non-streaming body is read), instead of the previous 500; failed connections still return 500 with call_upstream_connection_failed.",
+            "evidence": "model_gateway/src/routers/http/router.rs lines 1639-1655: convert_reqwest_error checks `e.is_timeout()` -> `(StatusCode::GATEWAY_TIMEOUT, \"call_upstream_timeout\")` and `e.is_connect()` -> 500 `call_upstream_connection_failed` before the generic is_request()/is_body() 500 arms; tests upstream_timeout_is_a_gateway_timeout (lines ~3379-3407) assert 504 and the call_upstream_timeout header. Stale doc passage: src/lib/content/concepts/reliability/retries.md line 131 says \"In regular HTTP mode, a failed connection to the worker and an upstream timeout are both a `500`\"; the Error Codes table in src/lib/content/reference/api/openai.md (lines 666-683) has no 504 row for the HTTP-path call_upstream_timeout code.",
+            "doc_paths": [
+              "src/lib/content/concepts/reliability/retries.md",
+              "src/lib/content/reference/api/openai.md"
+            ]
+          },
+          "status": "pending"
+        }
+      ]
     }
   }
 }
