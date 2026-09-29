@@ -183,9 +183,10 @@ The event index cuts each request's token IDs into blocks and looks the blocks u
 SMG picks the block size per model, in this order:
 
 1. **Learned from events** (highest priority): each worker's subscription records the block size of the first stored block it receives; the most recent value wins.
-2. **`--block-size`** (router-wide default).
+2. **`kv_block_size` from the worker spec** (not in v1.11.0; on main since smg-project/smg#2684): when a gRPC worker's KV event subscription starts, a non-zero `kv_block_size` in its spec fills the model's block size until the first stored event replaces it with the engine's actual page size. Only the first value seeds a model — a later worker's `kv_block_size` never changes a block size already seeded or learned — and `kv_block_size: 0` logs a warning and is ignored.
+3. **`--block-size`** (router-wide default).
 
-The `kv_block_size` field of a worker spec registered through the [admin API](../reference/api/admin.md) (`POST /workers`) is accepted but not applied in v1.11.0. In practice, keep the engine's page size (SGLang `--page-size`, vLLM `--block-size`, TokenSpeed `--prefix-granularity`) and SMG's `--block-size` equal, and let SMG correct itself once events arrive. The approximate token tree always uses `--block-size`. Serve each model with one page size: with mixed sizes, the model's block size is whichever a worker reported last.
+The `kv_block_size` field of a worker spec registered through the [admin API](../reference/api/admin.md) (`POST /workers`) is accepted but not applied in v1.11.0: registration drops the field from the spec it stores on the worker, so the event index never sees it. On main, an API-registered worker keeps the spec it was registered with, and `kv_block_size` seeds the index as above. Either way, keep the engine's page size (SGLang `--page-size`, vLLM `--block-size`, TokenSpeed `--prefix-granularity`) and SMG's `--block-size` equal, and let SMG correct itself once events arrive. The approximate token tree always uses `--block-size`. Serve each model with one page size: with mixed sizes, the model's block size is whichever a worker reported last.
 
 ---
 
