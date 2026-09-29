@@ -28,7 +28,7 @@ For an internal server, SMG removes these items from the Responses `output`:
 - `mcp_call` items for the server's tools
 - `mcp_approval_request` items for the server's tools
 
-A client-declared function tool that has the same name as an internal tool stays visible.
+A client-declared function tool that has the same name as an internal tool stays visible. The same rule covers members of a [`namespace` tool](api/responses.md): a namespaced `function_call` item carries the member `name` and a separate `namespace` field, and SMG judges it by the qualified `<namespace>.<name>`, the form under which the member was declared. A namespaced client function whose member name matches an internal tool therefore stays visible, while a bare call to the internal tool is still removed.
 
 ---
 
