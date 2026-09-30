@@ -58,7 +58,7 @@ The `model` and `tool_name` caps never evict a value once it is admitted, so the
 
 ### Removed workers
 
-The exporter cannot delete a series, so when a worker is removed SMG overwrites its per-worker gauges instead: `smg_worker_health` and `smg_worker_cb_state` become `-1`, `smg_worker_requests_active` and the circuit-breaker streak gauges become `0`, and the worker's `smg_engine_*` gauges become `-1`, as they also do while a worker is out of Ready. `smg_worker_http2` keeps its last value. Filter on the value (for example `== 1` or `>= 0`) when you aggregate these gauges.
+The exporter cannot delete a series, so when a worker is removed SMG overwrites its per-worker gauges instead: `smg_worker_health` and `smg_worker_cb_state` become `-1`, `smg_worker_requests_active` and the circuit-breaker streak gauges become `0`, and the worker's `smg_engine_*` gauges become `-1`, as they also do while a worker is out of Ready. On builds newer than v1.11.0, `smg_pd_prefill_admission_inflight` also becomes `0` (see [PD Prefill Admission Metrics](#pd-prefill-admission-metrics)). `smg_worker_http2` keeps its last value. Filter on the value (for example `== 1` or `>= 0`) when you aggregate these gauges.
 
 ---
 
@@ -519,6 +519,60 @@ histogram_quantile(0.95, sum by (model, le) (rate(smg_pd_ttft_seconds_bucket[5m]
 # PD dispatches that waited for, or were shed by, decode admission
 rate(smg_pd_admission_waits_total[5m])
 rate(smg_pd_admission_sheds_total[5m])
+```
+
+---
+
+### PD Prefill Admission Metrics
+
+Signals from the per-worker Prefill admission gate, which caps how many Prefill requests SMG itself has in flight on each prefill worker (smg-project/smg#1961). The gate is newer than the v1.11.0 release: v1.11.0 has neither its flags nor these series. It exists only when `--prefill-max-inflight-requests-per-worker` is positive (default `-1`, disabled), which requires PD or EPD mode. A request that finds every eligible prefill worker at the limit waits in a router-wide FIFO queue of `--prefill-queue-size` slots (default `100`) for up to `--prefill-queue-timeout-secs` seconds (default `60`). The HTTP PD router and the gRPC PD and EPD pipelines record the same series.
+
+#### `smg_pd_prefill_admission_inflight`
+
+Prefill requests currently holding an admission slot on each prefill worker, updated when a slot is taken or released. A slot is held until the request's Prefill phase ends, not until the decode response finishes, and the value never exceeds `--prefill-max-inflight-requests-per-worker`. When a worker is removed, the gauge is overwritten to `0` (see [Removed workers](#removed-workers)).
+
+| Type | Labels |
+|------|--------|
+| Gauge | `worker` |
+
+#### `smg_pd_prefill_admission_queued`
+
+Requests currently waiting for Prefill admission. The queue is one FIFO per gateway process, not per worker, so the gauge has no `worker` label; its depth is bounded by `--prefill-queue-size`.
+
+| Type | Labels |
+|------|--------|
+| Gauge | None |
+
+#### `smg_pd_prefill_admission_wait_seconds`
+
+Time a request spent queued for Prefill admission, recorded whenever a request leaves the queue, whatever the outcome: admitted, rejected, or abandoned because the client disconnected. A request admitted without waiting never enters the queue and records nothing. This histogram is exported as a Prometheus summary (quantile lines, no `_bucket` series); see [Histogram Buckets](#histogram-buckets).
+
+| Type | Labels |
+|------|--------|
+| Histogram | None |
+
+#### `smg_pd_prefill_admission_rejections_total`
+
+Requests the admission gate turned away.
+
+| Type | Labels |
+|------|--------|
+| Counter | `reason` |
+
+| `reason` | Response | Cause |
+|----------|----------|-------|
+| `unavailable` | The selection failure's own response, typically `503 no_available_workers` | No eligible prefill/decode pair exists at all; workers that are merely at the limit queue the request instead |
+| `queue_full` | `429 pd_prefill_queue_full` | Every queue slot was taken. With `--prefill-queue-size 0`, a request that finds every worker at the limit is rejected with this reason immediately |
+| `queue_timeout` | `429 pd_prefill_queue_timeout` | The request waited `--prefill-queue-timeout-secs` without a slot freeing |
+
+The HTTP PD router does not retry its own `429` rejections: the limit is this process's backpressure, and a retry would only queue the request behind it again. A client that disconnects while queued is not counted as a rejection; it only updates the queue gauge and the wait histogram.
+
+```promql
+# Prefill admission rejections per second, by reason
+sum by (reason) (rate(smg_pd_prefill_admission_rejections_total[5m]))
+
+# Requests waiting for Prefill admission
+smg_pd_prefill_admission_queued
 ```
 
 ---
@@ -1242,4 +1296,4 @@ Configure custom buckets for these histograms via CLI:
 smg launch --prometheus-duration-buckets 0.01 0.1 0.5 1 5 10
 ```
 
-Two histograms have fixed buckets of their own: `smg_tokio_event_loop_delay_seconds` (0 to 1 s) and `smg_cache_aware_match_ratio` (deciles). A histogram that matches none of these rules is exported as a Prometheus summary instead; in v1.11.0 that applies to `smg_worker_retry_backoff_seconds` and `smg_scheduler_queue_wait_seconds`.
+Two histograms have fixed buckets of their own: `smg_tokio_event_loop_delay_seconds` (0 to 1 s) and `smg_cache_aware_match_ratio` (deciles). A histogram that matches none of these rules is exported as a Prometheus summary instead; in v1.11.0 that applies to `smg_worker_retry_backoff_seconds` and `smg_scheduler_queue_wait_seconds`. On builds newer than v1.11.0, `smg_pd_prefill_admission_wait_seconds` matches none of them either and is likewise exported as a summary (see [PD Prefill Admission Metrics](#pd-prefill-admission-metrics)).
