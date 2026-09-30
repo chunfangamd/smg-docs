@@ -62,6 +62,8 @@ The vLLM, SGLang, TokenSpeed and MLX gRPC servers come from the `smg-grpc-servic
 
     `--smg-grpc-mode` needs SGLang 0.5.16 or later; older releases use `--grpc-mode`, now a deprecated alias. In this mode SGLang also opens an HTTP sidecar on `--port + 1` (move it with `--smg-http-sidecar-port`).
 
+    If the SGLang scheduler processes — the engine subprocesses behind the servicer — all exit, the server shuts itself down instead of keeping the gRPC port open with nothing behind it. A watchdog polls the schedulers' exit codes once per second; once every scheduler has exited (a partial exit doesn't trigger it), the server logs the exit codes, at error level when any is non-zero, marks its health service `NOT_SERVING`, drains in-flight RPCs, and stops. Run the worker under a supervisor that restarts it: SMG keeps probing the address, so the restarted worker [rejoins on its own](../concepts/reliability/health-checks.md). This shutdown needs `smg-grpc-servicer` 0.13.0 or later; an older servicer that loses its schedulers after startup keeps the gRPC server running until it is stopped manually.
+
 === "TensorRT-LLM"
 
     ```bash
