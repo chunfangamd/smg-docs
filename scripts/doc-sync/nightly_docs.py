@@ -101,8 +101,8 @@ def validate_placement(item, pages):
             raise ValueError("New pages require justification against the existing documentation")
     elif not canonical:
         raise ValueError("An existing-page update must identify its canonical pages")
-    elif reason.strip():
-        raise ValueError("New-page justification supplied without a new page")
+    # The pinned inventory determines whether a page is new. An explanation
+    # of why existing pages suffice is harmless metadata, not a new-page request.
 
 
 def validate_item(item):

@@ -48,7 +48,9 @@ model calls.
   There is **no page-count cap**. New Markdown pages are allowed under
   `src/lib/content/`; deletion, symlinks, executable files, code, and configuration
   changes are rejected. A new page needs a documented reason why existing pages
-  cannot host the concern. Writers must change all planned canonical pages; an
+  cannot host the concern. The pinned page inventory determines whether a page
+  is new; explanatory text in `new_page_reason` is also accepted for existing-page
+  updates. Writers must change all planned canonical pages; an
   incomplete correction is rejected. If an open PR blocks a necessary page,
   defer the whole concern instead of creating a new page or omitting the correction.
 - **100 new PRs per UTC day**, shared by scheduled/manual runs and retries. The
