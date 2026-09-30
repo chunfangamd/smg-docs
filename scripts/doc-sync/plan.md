@@ -21,7 +21,17 @@ Continue across those candidates: do not stop after a handful of easy findings
 while other promising candidates remain unexamined. Aim for broad coverage,
 not a quota of PRs; never invent gaps or lower accuracy to fill the cap.
 Finish evidence gathering within 80 turns and reserve the remaining budget for
-the structured plan. Return an empty concerns list when no supported gaps remain.
+the structured plan. The hard ceiling is 200 turns to absorb tool batches and
+final-output overhead; it is not a target for additional investigation. Stop
+investigating at the 80-turn target, return the supported concerns already found,
+and record unfinished candidates in remaining_work. Return an empty concerns
+list when no supported gaps remain.
+
+Revisit pending_concerns relevant to your subsystem before new candidates.
+These are retained evidence from earlier production plans, not permission to
+publish: recheck current source, documentation, placement, and existing PRs.
+Retire concerns that are no longer valid or already addressed; do not preserve
+stale claims merely because a previous scan proposed them.
 Every code_history line begins with an integer commit ID, then its full SHA.
 Use the integer ID for source_commit and inspected_commits; the workflow owns
 resolving IDs to exact hashes. Never retype a SHA in a structured source field.
@@ -31,6 +41,21 @@ inspection). Every concern's source_commit must be in that list. Return remainin
 as a concise description of unexamined candidates and why you stopped, or state
 that the supplied candidates have been exhausted. This is a self-reported
 coverage measure, not proof of an exhaustive audit.
+
+PAGE PLACEMENT — CORRECT EXISTING PAGES FIRST:
+Use doc_inventory (existing page titles and headings) to find candidate homes.
+Read those pages and search all docs for the affected fields, commands, defaults,
+and old claims. Record pages actually read in placement.examined_pages.
+placement.canonical_pages must list every existing page whose treatment of THIS
+concern needs correction or extension. Include all of them in doc_paths. Prefer
+editing the existing section; one concern per PR does not mean one page per PR.
+A new page is allowed only for a distinct reader task/reference that cannot fit
+reasonably in existing pages. Explain the alternatives considered and why they
+are unsuitable in placement.new_page_reason (empty when adding no pages).
+A new page must never replace correcting an existing false claim. File conflicts,
+throughput targets, and keeping PRs separate are not reasons to add a page.
+If any necessary canonical correction is blocked by an open PR, defer the whole
+concern in remaining_work; do not omit that page or relocate the same content.
 
 ONE CONCERN PER ITEM, never one item per broad subsystem or per day's changes:
 
@@ -56,9 +81,10 @@ ONE CONCERN PER ITEM, never one item per broad subsystem or per day's changes:
 Before selecting anything, inspect existing_prs in the context, including human
 PRs and closed nightly PRs. Do not duplicate a concern already being addressed,
 even if its title, slug, or source commit differs. A closed-unmerged nightly PR
-means a maintainer declined that concern: do not recreate it. A merged PR should
-already be reflected in current docs; only a genuinely later code change can
-justify another update. Prefer focused task/reference pages where they are a natural home for an
+means a maintainer declined that concern: do not recreate it. A merged related PR does not prove all existing pages are correct. A distinct
+stale claim left behind on another canonical page may justify a separately scoped
+follow-up against the original source commit. Do not repeat merged content or
+rename an already covered concern just to bypass deduplication. Prefer focused task/reference pages where they are a natural home for an
 independent concern, rather than putting every CLI topic in the overview. Do not
 create duplicate pages merely to evade an open PR or file conflict.
 No two selected items may touch the same doc file; defer
