@@ -101,7 +101,7 @@ POST /v1/chat/completions
 | `logprobs` | boolean | No | Return log probabilities of the output tokens |
 | `top_logprobs` | integer | No | Most likely tokens to return per position (0-20); requires `logprobs: true` |
 | `logit_bias` | object | No | Map of token ID to bias |
-| `tools` | array | No | Function tools the model may call |
+| `tools` | array | No | Function tools the model may call. A function's `parameters` JSON Schema may be omitted or set to `null`; SMG reads either as the empty schema `{}` — a function that takes no arguments — and HTTP workers receive an explicit `"parameters": {}` unless the HTTP router streams the request to the worker unparsed (see [Request Streaming](../../concepts/performance/request-streaming.md)) |
 | `tool_choice` | string/object | No | `none`, `auto`, `required`, `{"type": "function", "function": {"name": "..."}}`, or `{"type": "allowed_tools", "mode": "auto", "tools": [...]}` (`mode` is `auto` or `required`). Every value except `none` and `auto` requires tools, and a named function must exist in them |
 | `parallel_tool_calls` | boolean | No | Allow parallel function calls |
 | `response_format` | object | No | `text`, `json_object`, or `json_schema`. See [Structured Output](#structured-output) |
