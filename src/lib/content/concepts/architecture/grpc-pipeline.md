@@ -98,6 +98,7 @@ SMG handles routing, load balancing, and failover. Workers run full OpenAI-compa
 | Cache-aware routing key | Token IDs from the gateway's tokenizer | Request text, or token IDs when the request is pre-tokenized |
 | Reasoning extraction | Gateway | Worker |
 | Tool call parsing | Gateway | Worker |
+| Stop sequence enforcement | Gateway (see [Stop Sequences](#stop-sequences)) | Worker |
 | MCP execution (Responses API) | Gateway | Not handled by the gateway |
 
 The same pipeline serves Chat Completions, the Messages API and the Responses API. gpt-oss models use a separate Harmony pipeline. SMG selects it when a worker's model card lists the `GptOssForCausalLM` architecture or the `gpt_oss` model type, or when the model name contains `gpt-oss`. Harmony has its own encoding and output channels, so the chat templates and parser registries on this page don't apply to it.
@@ -354,7 +355,7 @@ In the regular gRPC pipeline, the tool constraint is generated **after the promp
 3. Tokenize
 4. Process multimodal inputs (see [Multimodal Pipeline](multimodal.md))
 5. **Build the tool constraint** (`generate_tool_constraint`)
-6. Build the stop decoder, then worker selection and dispatch
+6. Build the stop decoder (see [Stop Sequences](#stop-sequences)), then worker selection and dispatch
 
 The Harmony pipeline (gpt-oss) builds its structural tags before encoding (`model_gateway/src/routers/grpc/harmony/stages/preparation.rs`). It rejects a request that combines a forced tool call with `response_format`.
 
@@ -388,6 +389,38 @@ The constraint travels in the request's `SamplingParams.constraint` oneof (`crat
 - **MLX**: doesn't support constraints. It rejects a chat request with a forced tool call or a `response_format` (400) and ignores the chat `regex` and `ebnf` extensions.
 
 See [gRPC Workers](../../getting-started/grpc-workers.md) for the launch commands.
+
+---
+
+## Stop Sequences
+
+In gRPC mode the gateway enforces `stop` itself. [Preparation](#where-it-runs-in-the-pipeline) builds a per-request **stop decoder** that detokenizes the engine's output and checks it against:
+
+- **`stop` strings** — hidden by default: the choice finishes and the matched string is trimmed from the output. With `"no_stop_trim": true` matches are visible, so the matched text stays in the output.
+- **Token-level stops** — the request's `stop_token_ids` plus the tokenizer's EOS token ids, unless `"ignore_eos": true` leaves the EOS ids out.
+
+The decoder sees the raw decoded text before reasoning extraction and tool parsing, so a `stop` string also matches inside chain-of-thought. The request fields are documented in the [OpenAI-Compatible API](../../reference/api/openai.md).
+
+The engine doesn't always get the stop strings. Requests to SGLang workers and to workers on the [ZMQ direct backend](../../getting-started/zmq-workers.md) leave the gateway without them — those engines run on token IDs and can't match text. A stop string that encodes to a single token is re-sent as a `stop_token_ids` entry so the engine can still halt early; a multi-token stop exists only in the gateway's decoder, and the engine generates on until its own limit. gRPC vLLM and TokenSpeed workers receive the strings and can match them engine-side as well; the contract below is the same either way.
+
+### Streaming Hold-Back
+
+A stop sequence can arrive split across tokens, so a streaming response withholds text that might still become a match — and nothing more (smg-project/smg#2203):
+
+- Only the longest tail of the output that is still a proper prefix of some stop sequence is held back. Everything before it is emitted with the token that produced it, so an unmatched `stop` word doesn't delay the stream by its own length.
+- As soon as the held text can no longer complete any stop sequence, it is released in full.
+- When the engine finishes without a match, leftover held text is flushed through the same reasoning and tool parser path as every other chunk. A `stop` word that never fires can't change the `reasoning_content`/`content` split or leak parser-buffered text into `content`.
+
+### Finish Reason and Matched Stop
+
+A match by the gateway's decoder pins the choice's outcome. The engine's own finish reason — typically `length` when it never saw the stop strings — can't overwrite it, and any further engine output for that choice is discarded:
+
+| Field | On a gateway-side match |
+|-------|-------------------------|
+| `finish_reason` | `stop` |
+| `matched_stop` | The matched stop string; unset when a token-level stop fired |
+
+Non-streaming responses apply the same precedence and fall back to the engine's `matched_stop` when the local decoder didn't match. Parsed tool calls upgrade a `stop` finish reason to `tool_calls`, never a `length`, `failed` or `error` one. The Messages API runs `stop_sequences` through the same decoder (always trimmed — it has no `no_stop_trim`, `stop_token_ids` or `ignore_eos`) and reports a match as `stop_reason: "stop_sequence"` with the string in `stop_sequence`.
 
 ---
 
