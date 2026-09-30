@@ -123,7 +123,7 @@ The servicer reads each setting below from its `--mm-*` flag when the launcher p
 | `--mm-sidecar-max-queue` | `SMG_VLLM_MM_SIDECAR_MAX_QUEUE` | `256` | Fail fast once this many jobs are queued for the sidecar |
 | `--mm-sidecar-namespace` | `SMG_VLLM_MM_SIDECAR_NAMESPACE` | derived | Overrides the Redis key namespace |
 
-`SMG_VLLM_MM_MAX_VIDEO_FRAMES` (env only; default `0`, which leaves it to vLLM's `--media-io-kwargs`) caps the frames a video is sampled to.
+`SMG_VLLM_MM_MAX_VIDEO_FRAMES` (env only; default `0`, which leaves it to vLLM's `--media-io-kwargs`) caps the frames a video is sampled to. A positive cap only ever lowers the effective frame count: the `video.num_frames` from vLLM's `--media-io-kwargs` or, when that sets none, vLLM's own default frame count, and a non-positive configured count (meaning every frame) is replaced by the cap. When neither is available — `--media-io-kwargs` sets no `video.num_frames` and vLLM's default cannot be read — the cap is not applied: the servicer logs a warning and leaves sampling as vLLM decides, since a maximum must never raise it (smg-project/smg#2649). The cap applies on both the in-process and the Redis sidecar paths; in `redis` mode the sidecar reads the variable from its own environment, so set it on the sidecar process.
 
 The worker advertises its processor in the `mm_processor`, `mm_processor_source`, and `mm_media_ref_schemes` labels, which appear in `GET /workers`. An engine started with `--language-model-only` never advertises one. vLLM's own `--allowed-media-domains`, `--allowed-local-media-path`, `--media-io-kwargs`, `--limit-mm-per-prompt`, and `VLLM_*_FETCH_TIMEOUT` govern fetching on the worker; without `--allowed-media-domains` the worker fetches from any host.
 
