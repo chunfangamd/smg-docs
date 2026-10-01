@@ -220,6 +220,24 @@ event: message_stop
 data: {"type":"message_stop"}
 ```
 
+### Block Sequencing
+
+The stream SMG builds for [gRPC and ZMQ workers](#grpc-and-zmq-workers) keeps exactly one content block open at a time:
+
+- A `content_block_start` comes only after the previous block's `content_block_stop`, and each block takes the next index: `0`, `1`, `2`, and so on.
+- Every `content_block_delta` carries the open block's index and a delta of its type: `thinking_delta` for a `thinking` block, `text_delta` for `text`, `input_json_delta` for `tool_use`.
+- The last block is stopped before `message_delta`.
+
+Blocks arrive in the order the output is parsed. Types can alternate, and a type can repeat: a model that thinks, calls a tool, answers, and thinks again produces `thinking`, `tool_use`, `text`, and `thinking` blocks at indices 0 through 3. The fixed order of the non-streaming `content` array does not apply to a stream, so accumulate blocks by index, as the Anthropic SDKs do.
+
+Two consequences at block boundaries:
+
+- An engine chunk can finish a tool call's arguments and continue with text after the call. The `input_json_delta` fragments that finish the open `tool_use` block are sent first, then the text.
+- When the model re-enters thinking while a `tool_use` block is open (for example, a `<think>` token in the middle of the call's arguments), SMG stops the `tool_use` block to start the `thinking` block. Argument fragments that arrive after that have no open block and are dropped, so the stopped block's accumulated `input` can be empty or incomplete JSON.
+
+!!! note "Changed after v1.11.0"
+    These guarantees come from smg-project/smg#2715, which is newer than v1.11.0. In v1.11.0 and earlier the stops were incomplete — most visibly, a `thinking` block that began after text or a tool call, or a `text` block that began while reasoning was still open, did not stop the open block — so blocks could overlap and share an index, which breaks the Anthropic SDKs' stream accumulators.
+
 ---
 
 ## Count Tokens
@@ -320,7 +338,7 @@ MLX workers answer `400` to a request with images, with `stop_sequences`, or wit
 
 How the response is built:
 
-- **Tool calls and reasoning** are extracted by SMG's tool and reasoning parsers, which SMG picks for the model or you set with `--tool-call-parser` and `--reasoning-parser`. A `thinking` block comes first, then text, then `tool_use` blocks. Thinking blocks carry an empty `signature`.
+- **Tool calls and reasoning** are extracted by SMG's tool and reasoning parsers, which SMG picks for the model or you set with `--tool-call-parser` and `--reasoning-parser`. In a non-streaming response, a `thinking` block comes first, then text, then `tool_use` blocks; a stream emits blocks in the order the output is parsed (see [Block Sequencing](#block-sequencing)). Thinking blocks carry an empty `signature`.
 - **`tool_use` ids** use Anthropic's `toolu_` prefix: a parser id of the form `call_<suffix>` is returned as `toolu_<suffix>`, the same in streaming and non-streaming responses. Model-specific id formats are returned unchanged (smg-project/smg#2111).
 - **`stop_reason`** is `tool_use` when the output has tool calls, `stop_sequence` when one of `stop_sequences` ended generation (the matched string is in `stop_sequence`), `max_tokens` when the token limit was reached, and `end_turn` otherwise.
 - **`usage`** reports `cache_creation_input_tokens` and `cache_read_input_tokens` as `0`, never `null`. In a stream, `message_start` carries zero counters, and the final `message_delta` carries `output_tokens` and, once the engine has reported it, `input_tokens` (smg-project/smg#2269).
