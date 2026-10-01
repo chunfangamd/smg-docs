@@ -69,6 +69,7 @@ SMG has several controls that react to load. They act at different points and do
 | [Rate limiting](rate-limiting.md) and the [priority scheduler](priority-scheduling.md) | Admission, before routing | Requests in flight through this gateway | Queues the request, then rejects it: `429` when the queue is full, `503` when the queue wait times out, both with `Retry-After: 2` |
 | Cache-aware de-ranking (`--overload-token-usage-threshold`) | Inside the `cache_aware` policy | KV usage of the hottest backend, compared with `>` | Drops prefix affinity for that decision and picks by load. The hot worker stays eligible and nothing is rejected |
 | `least_load` waiting cap (`--least-load-max-waiting-requests`) | Inside the `least_load` policy | Reported waiting requests plus requests dispatched since the last poll | Skips capped workers. When every candidate is capped, the policy picks none and the request fails with `503 no_available_workers` |
+| [PD Prefill admission queue](#pd-prefill-admission-queue) (`--prefill-max-inflight-requests-per-worker`) | Prefill worker selection in PD and EPD mode, on the HTTP and gRPC routers | Prefill legs in flight through this gateway, counted per prefill worker | Queues the request in a gateway-wide FIFO while every eligible prefill worker is at its limit, then rejects it: `429 pd_prefill_queue_full` when the queue is full, `429 pd_prefill_queue_timeout` when the wait times out |
 | **Worker overload protection** (`--worker-overload-*`) | Worker eligibility, for every policy, on the HTTP and gRPC routers | Waiting requests (summed across DP ranks) and mean KV token usage, compared with `>=` | Excludes the worker until a report comes back under every threshold. When every candidate is excluded, the request is shed immediately with `503 worker_overload_protection_shed` |
 
 The layers stack: admission control bounds what the gateway accepts, the routing policy decides where a request goes, and overload protection decides which workers may receive it at all.
@@ -245,6 +246,18 @@ This gate is on by default and independent of the overload thresholds. Keep the 
 
 ---
 
+## PD Prefill Admission Queue
+
+The prefill leg has its own, opt-in gate: `--prefill-max-inflight-requests-per-worker` caps the prefill legs this gateway keeps in flight per prefill worker, in PD and EPD mode on the HTTP and gRPC routers (default `-1`, off). Unlike the controls above, it queues before it rejects:
+
+- **A worker has room**: the request takes one slot on its selected prefill worker and holds it for the Prefill phase only; the decode stream runs with the slot already released.
+- **Every eligible prefill worker is full**: the request waits in a gateway-wide FIFO queue of up to `--prefill-queue-size` requests (default `100`) for `--prefill-queue-timeout-secs` seconds (default `60`). A full queue is rejected with `429 pd_prefill_queue_full` and a timed-out wait with `429 pd_prefill_queue_timeout`; `--prefill-queue-size 0` rejects instead of waiting.
+- **No eligible prefill worker at all**: the request keeps the selection's own verdict, such as `503 no_available_workers` or an overload shed, instead of queueing.
+
+The gate counts only what this gateway instance admits, cannot be combined with `--priority-scheduler-enabled`, and is newer than the v1.11.0 release. `smg_pd_prefill_admission_queued` gauges the queue depth and `smg_pd_prefill_admission_rejections_total` counts the rejections by `reason`. The FIFO contract, the flag validation, and the remaining admission metrics are described in [PD Disaggregation](../routing/pd-disaggregation.md#prefill-admission-queue).
+
+---
+
 ## Monitoring
 
 ### Metrics
@@ -405,7 +418,7 @@ The values above are starting points, not recommendations for your hardware. Siz
 | Cache-aware keeps piling onto a hot worker until it is vetoed | Set `--overload-token-usage-threshold` below `--worker-overload-token-usage`, so cache-aware spreads load before the veto fires |
 | gRPC PD requests shed at stage `pd_admission` | Add decode capacity, or raise `--pd-admission-wait-secs` while keeping it under the engine's bootstrap deadline |
 
-Overload protection sheds; it does not queue. Keep [rate limiting](rate-limiting.md) or the [priority scheduler](priority-scheduling.md) in front of it to bound what the gateway accepts, and make sure clients honor `Retry-After`.
+Overload protection sheds; it does not queue. The [PD Prefill admission queue](#pd-prefill-admission-queue) is the exception on this page: it holds a request for a bounded wait before rejecting it. Keep [rate limiting](rate-limiting.md) or the [priority scheduler](priority-scheduling.md) in front of overload protection to bound what the gateway accepts, and make sure clients honor `Retry-After`.
 
 ---
 

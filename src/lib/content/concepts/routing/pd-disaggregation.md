@@ -193,6 +193,9 @@ Token counting generates nothing, so SMG sends it to a single prefill worker and
 | `--decode-policy` | `--policy` | Routing policy for the decode leg |
 | `--pd-pairing-mode` | `lenient` | `off`, `lenient`, or `strict`: how strictly the legs must share a KV transfer protocol. See [Pairing](#prefilldecode-pairing) |
 | `--pd-admission-wait-secs` | `30` | gRPC only: how long a dispatch waits for a free decode slot before it is shed |
+| `--prefill-max-inflight-requests-per-worker` | `-1` (off) | In-flight prefill legs this gateway allows per prefill worker. A positive value enables the [Prefill admission queue](#prefill-admission-queue); newer than v1.11.0 |
+| `--prefill-queue-size` | `100` when enabled | Requests that may wait for prefill admission. `0` rejects instead of waiting. Requires the cap above |
+| `--prefill-queue-timeout-secs` | `60` when enabled | Seconds a request may wait for prefill admission. Requires the cap above |
 | `--dp-aware` | off | Register one worker per data-parallel rank. vLLM Mooncake needs it to mint engine ids for DP>1 prefill workers |
 | `--model-path`, `--tokenizer-path` | — | gRPC only: a tokenizer SMG loads at startup, also used for workers that report no tokenizer or model path |
 
@@ -347,6 +350,21 @@ When no prefill shares a protocol with any decode, requests fail with 503 `no_co
 
 Before a gRPC PD or EPD dispatch goes out, SMG claims one room for each backend request on the decode worker, within the running window that engine reports: SGLang's `max_running_requests` or TokenSpeed's `max_num_seqs` (the engines' `--max-running-requests` and `--max-num-seqs` flags). When the window is full, the request waits up to `--pd-admission-wait-secs` (default `30`) and is then shed with 503 `worker_overload_protection_shed` and a `Retry-After` header. `0` sheds immediately. Keep the wait well under the engine's bootstrap deadline (120 seconds on TokenSpeed). Decode workers that report no window, such as vLLM, are not gated. `smg_pd_admission_waits_total` counts dispatches admitted after a wait, and `smg_pd_admission_sheds_total` counts the sheds. See [Overload Protection](../reliability/overload-protection.md).
 
+### Prefill Admission Queue
+
+`--prefill-max-inflight-requests-per-worker` caps how many prefill legs this gateway instance keeps in flight on each prefill worker, over HTTP and gRPC, in PD and EPD mode. The cap is off by default (`-1`). Each admitted request holds one slot on its prefill worker for the Prefill phase only — a batch or `n>1` fan-out holds one slot for the whole client request — and the slot is released when the prefill leg finishes (over HTTP, once the prefill body is read or drained), not when the decode stream ends.
+
+- **A candidate has room**: prefill workers at their limit leave the candidate set before the prefill policy runs, and the policy picks among the rest.
+- **Every eligible prefill worker is full**: the request waits in a gateway-wide FIFO queue of up to `--prefill-queue-size` requests (default `100`) for up to `--prefill-queue-timeout-secs` seconds (default `60`). A full queue answers 429 `pd_prefill_queue_full`; a request that waits out the timeout answers 429 `pd_prefill_queue_timeout`. `--prefill-queue-size 0` disables waiting, so an at-capacity fleet answers 429 `pd_prefill_queue_full` immediately.
+- **No eligible prefill worker at all**: the request is not queued and keeps the selection's own error, such as 503 `no_available_workers` — the queue only holds requests that have a worker to wait for.
+
+The queue is strict FIFO: waiting requests hold no worker, and only the head of the queue may run the prefill policy and claim a slot, so a later request never overtakes an earlier one even while capacity is free. The head re-runs its selection when a slot is released or a worker is added, removed, replaced, or changes health state, and once per second besides, so a circuit breaker that recovers without an event is still noticed. One exception to the candidate filtering: under a `consistent_hashing` prefill policy, a request with an [`X-SMG-Target-Worker` header](load-balancing.md#routing-headers) waits for the worker it names instead of being moved to another one.
+
+Startup rejects the queue flags without a positive cap, a positive queue size with a zero timeout, the cap outside PD or EPD mode, and the cap combined with `--priority-scheduler-enabled`. The HTTP PD router answers an admission rejection without [retrying](../reliability/retries.md) it, because the rejection is this gateway's own backpressure; the gRPC pipelines retry it like any other retryable failure, re-entering admission on each attempt. `smg_pd_prefill_admission_inflight` (per worker) and `smg_pd_prefill_admission_queued` gauge the held slots and the queue depth, `smg_pd_prefill_admission_wait_seconds` records the time spent queued, and `smg_pd_prefill_admission_rejections_total` counts rejections by `reason` (`queue_full`, `queue_timeout`, `unavailable`).
+
+!!! note "Newer than v1.11.0"
+    The Prefill admission gate landed after the v1.11.0 release. Its three flags exist on `main` builds and are not in v1.11.0.
+
 ### Context Length (gRPC)
 
 On the gRPC path, SMG counts the prompt tokens itself and rejects a prompt longer than the model's context window with 400 `context_length_exceeded` before dispatch. In PD mode the smaller window of the two legs applies. Workers that advertise no window are not checked, and the HTTP path leaves the check to the engine.
@@ -358,6 +376,8 @@ On the gRPC path, SMG counts the prompt tokens itself and rejects a prompt longe
 | 503 | `no_available_workers` | A leg has no available worker (unhealthy or circuit open). Over HTTP, the message names the leg. Same code as the regular HTTP and gRPC routers |
 | 503 | `no_compatible_pd_pair` | No prefill shares a KV transfer protocol with any decode |
 | 503 | `worker_overload_protection_shed` | The decode admission window stayed full, or [overload protection](../reliability/overload-protection.md) vetoed a leg. Sent with `Retry-After` |
+| 429 | `pd_prefill_queue_full` | The [Prefill admission queue](#prefill-admission-queue) has no room — or waiting is disabled — while every eligible prefill worker is at its in-flight limit |
+| 429 | `pd_prefill_queue_timeout` | The request waited out `--prefill-queue-timeout-secs` in the Prefill admission queue |
 | 400 | `context_length_exceeded` | gRPC: the prompt exceeds the smaller context window of the two legs |
 | 400 | `runtime_pd_not_supported` | gRPC: the selected runtime has no PD protocol |
 | Engine status | `prefill_worker_failed_to_start`, `decode_worker_failed_to_start` | gRPC: the engine refused that leg |
@@ -517,6 +537,7 @@ smg_worker_requests_active
 | 503 `no_available_workers` | A leg has no healthy worker with a closed circuit (over HTTP, the message names it) | Check `/workers`; restore or add workers on that leg |
 | 503 `no_compatible_pd_pair` | No prefill shares a KV transfer protocol with any decode | Compare the `pd_pairing` keys in `/workers`; align the engines or set a shared [pairing protocol](#explicit-pairing-protocol) |
 | 503 `worker_overload_protection_shed` | The decode admission window stayed full, or a leg is overloaded | Add decode workers or raise the engine's running window |
+| 429 `pd_prefill_queue_full` or `pd_prefill_queue_timeout` | The per-worker [prefill admission](#prefill-admission-queue) cap is holding requests back | Add prefill workers, raise `--prefill-max-inflight-requests-per-worker`, or resize the wait with `--prefill-queue-size` and `--prefill-queue-timeout-secs` |
 | 400 `context_length_exceeded` (gRPC) | The prompt exceeds the smaller context window of the two legs | Shorten the prompt or give both legs the same context length |
 | vLLM PD answers correctly but decode recomputes prompts | The prefill worker has no KV connector (`mode="passthrough"`), or a NIXL prefill returned no params (`smg_pd_kv_transfer_failures_total`) | Register HTTP workers with `kv_connector`; check `--kv-transfer-config`; upgrade the servicer |
 | SGLang `n>1` completions stall over HTTP | The HTTP PD router has no per-sample fan-out | Serve `n>1` traffic through gRPC workers |
