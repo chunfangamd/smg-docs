@@ -4,7 +4,7 @@ title: Chat History
 
 # Chat History
 
-SMG supports multiple storage backends for persisting the conversations, conversation items, and stored responses behind the Responses and Conversations APIs, for analytics, debugging, and compliance.
+SMG supports multiple storage backends for persisting the conversations, conversation items, and stored responses behind the Responses and Conversations APIs, for analytics, debugging, and compliance. Stored history is shared across every caller of the gateway — see [Who Can Access Stored Data](#who-can-access-stored-data).
 
 ---
 
@@ -327,6 +327,20 @@ Complete response records including:
 - Model information
 - Timestamps and metadata
 - Token usage
+
+---
+
+## Who Can Access Stored Data
+
+Stored history is gateway-global, not per-caller. Every record is looked up by its ID alone: the handlers and storage backends never filter by who is asking, and the tenant identity behind an API key is not attached to stored data. Any request that passes data plane authentication can act on any stored object whose ID it presents:
+
+- Retrieve, delete, or cancel a stored response (`/v1/responses/{id}`), or list its input items
+- Read, update, or delete any conversation and its items (`/v1/conversations/*`)
+- Continue a response stored by another caller, by passing its ID as `previous_response_id`
+
+Per-tenant API keys don't change this. A `--tenant-api-key` identity feeds [tenant rate limits](../reliability/tenant-rate-limiting.md) and the [priority scheduler](../../reference/priority-scheduler.md), not storage: a caller holding one tenant's key can read and delete history created under another tenant's key or under the shared `--api-key`. And when neither `--api-key` nor `--tenant-api-key` is set, the data plane is open, so anyone who can reach the gateway can do the same (see [Authentication](../security/authentication.md)).
+
+This holds for every backend — `memory`, `postgres`, `redis`, and `oracle` each keep one store shared by all callers of the gateway. To keep one group of callers from reading another's history, run them against separate gateway deployments with separate history backends (or separate databases or schemas).
 
 ---
 

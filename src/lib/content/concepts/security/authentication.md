@@ -55,14 +55,14 @@ Track all control plane operations for security monitoring and compliance.
 | **Control plane JWT/OIDC** | Enterprise SSO integration with identity providers (admin routes) | `--jwt-issuer`, `--jwt-audience` |
 | **Control plane API keys** | Service accounts and programmatic access (admin routes) | `--control-plane-api-keys` |
 | **Data plane API key** | Shared bearer token gating data plane routes; also the default API key of startup and discovered workers | `--api-key` |
-| **Data plane tenant keys** | Per-tenant bearer tokens for data plane routes, each resolving to its own tenant identity | `--tenant-api-key` |
+| **Data plane tenant keys** | Per-tenant bearer tokens for data plane routes, each resolving to its own tenant identity (for rate limiting and scheduling, not data isolation) | `--tenant-api-key` |
 
 ### When to Use Each Method
 
 - **Control plane JWT/OIDC**: Use for enterprise deployments with existing identity providers (Keycloak, Auth0, Azure AD, Okta). Provides centralized user management and SSO for control plane operations.
 - **Control plane API keys**: Use for service-to-service automation against admin endpoints (CI/CD pipelines, tooling). Simpler to set up but requires manual key management.
 - **Data plane API key**: Use when you want a single shared secret that clients present on data plane routes (chat, completions, responses, and so on), and that workers started with the same key accept.
-- **Data plane tenant keys**: Use when each team or application needs its own data plane key, so that [tenant rate limits](../reliability/tenant-rate-limiting.md) and priority scheduling can tell callers apart. Each `--tenant-api-key tenant_id:key` resolves to the tenant `auth:<tenant_id>`. Tenant keys never unlock control plane routes, and the flag belongs to the Rust `smg` binary (the Python launcher does not accept it).
+- **Data plane tenant keys**: Use when each team or application needs its own data plane key, so that [tenant rate limits](../reliability/tenant-rate-limiting.md) and priority scheduling can tell callers apart. Each `--tenant-api-key tenant_id:key` resolves to the tenant `auth:<tenant_id>`. Tenant keys never unlock control plane routes, and the flag belongs to the Rust `smg` binary (the Python launcher does not accept it). They also don't partition stored chat history: with a [history backend](../data/chat-history.md), any data plane credential can retrieve, delete, or continue any stored response or conversation by its ID, whichever key created it — see [Who Can Access Stored Data](../data/chat-history.md#who-can-access-stored-data).
 
 JWTs and control plane API keys are checked only on control plane routes. Data plane routes accept only `--api-key` and `--tenant-api-key` credentials, and are open when neither is set.
 
