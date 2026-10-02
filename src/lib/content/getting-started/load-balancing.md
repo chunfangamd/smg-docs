@@ -112,7 +112,7 @@ smg --policy consistent_hashing --worker-urls http://w1:8000 http://w2:8000
 | `X-SMG-Target-Worker` | Route to a worker by 0-based index into the model's available workers; `503` if that index has no available worker |
 | `X-SMG-Routing-Key` | Consistent hash routing for session affinity. Non-empty UTF-8, at most 128 bytes; add names with `--routing-key-headers` |
 
-**Priority:** `X-SMG-Target-Worker` > body `rid` (with `--routing-key-override`) > routing-key header > implicit keys > random fallback
+**Priority:** `X-SMG-Target-Worker` > routing-key header > body `rid` (with `--routing-key-override`) > implicit keys > random fallback
 
 Best for session affinity and user-to-worker pinning.
 
@@ -167,7 +167,7 @@ Both flags are shared with `cache_aware`. Best for PD disaggregation where prefi
 
 ## Manual
 
-Pins each routing key to a worker and keeps it there until that worker becomes unavailable or the key goes unused for `--max-idle-secs`. Keys come from the `X-SMG-Routing-Key` header, or from the request body's `rid` when `--routing-key-override` is also enabled. Requests without a key are placed by the assignment mode and not pinned.
+Pins each routing key to a worker and keeps it there until that worker becomes unavailable or the key goes unused for `--max-idle-secs`. Keys come from the routing-key headers (`X-SMG-Routing-Key` by default), falling back to the request body's `rid` when `--routing-key-override` is also enabled. Requests without a key are placed by the assignment mode and not pinned.
 
 ```bash
 smg launch \
