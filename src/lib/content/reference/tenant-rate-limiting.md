@@ -65,6 +65,11 @@ tenants:
 
 A tenant not listed under `tenants` uses `default_policy`, with its own buckets: tenants never share a bucket. Tenant keys are the same canonical keys SMG resolves elsewhere in the request path — `auth:<id>`, `header:<id>`, `ip:<address>`, or `anonymous` — there's no separate tenant-identity system for this feature. A `--tenant-api-key team-red:<key>` caller resolves to `auth:team-red`; a caller using the shared `--api-key` resolves to `auth:` followed by the hex SHA-256 of that key.
 
+An `ip:<address>` key — and the per-IP identity an unauthenticated caller falls back to when no API-key identity exists and no trusted tenant header matches — always names the connection's **TCP peer address**, taken from the gateway's own listener. Tenant resolution never reads `X-Forwarded-For`, `Forwarded`, or any other proxy header.
+
+!!! warning "`ip:` tenants behind a reverse proxy or load balancer"
+    When traffic reaches the gateway through a reverse proxy, ingress, or load balancer, the peer address is the proxy's, not the original client's. Every unauthenticated caller then resolves to the same `ip:<proxy-address>` tenant, sharing one `default_policy` bucket — and an `ip:` entry naming the proxy's address governs all of that traffic as a single tenant. Per-IP identity only separates callers that connect to the gateway directly; behind a proxy, use per-tenant API keys (`auth:`) or `--trust-tenant-header` (`header:`) for per-caller policies.
+
 ### `default_policy` / `tenants[]` fields
 
 | Field | Type | Meaning |
@@ -92,6 +97,7 @@ Checked once, at load, before the gateway ever serves traffic on this config:
 
 - `default_policy` must **not** set `tenant_key`; every entry under `tenants` **must**.
 - Tenant keys must be non-empty, have no surrounding whitespace, be unique across `tenants`, and be a canonical serving-path tenant key (`auth:`, `header:`, `ip:`-prefixed, or exactly `anonymous`) — a bare ID copy-pasted without its prefix is rejected rather than silently never matching.
+- An `ip:` key must be written exactly as the gateway renders the address: the part after `ip:` has to parse as an IP address *and* round-trip to the same string. IPv4 dotted-quad passes as-is; IPv6 must use the canonical compressed, lowercase form (`ip:2001:db8::1`). An expanded or uppercase spelling like `ip:2001:0DB8:0000:0000:0000:0000:0000:0001` parses but could never match a resolved key, so it is rejected at load.
 - A `header:` tenant key requires `--trust-tenant-header`, since without it no request resolves to a `header:` tenant.
 - `tokens_per_minute` and `requests_per_minute` must be `> 0`, on every scope (`default_policy`, each tenant, each model rule).
 - `rule_id` must match `[A-Za-z0-9._-]+`, and be unique within its tenant (or `default_policy`).

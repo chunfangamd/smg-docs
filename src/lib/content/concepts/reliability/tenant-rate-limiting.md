@@ -60,7 +60,7 @@ A policy is **tenant-global limits**, plus optional **per-model rules** layered 
 - At most **one** model rule applies per request — an exact match wins over a prefix match, and the longest prefix wins among competing prefixes. Rules never stack with each other.
 - When a model rule does apply, a reservation debits **both** the tenant-global bucket and the matching rule's bucket, and is only admitted if both can afford it.
 
-Tenant identity uses the same tenant key SMG already resolves elsewhere in the request path (`auth:<id>`, `header:<id>`, `ip:<address>`, or `anonymous`) — there is no separate identity system to configure.
+Tenant identity uses the same tenant key SMG already resolves elsewhere in the request path (`auth:<id>`, `header:<id>`, `ip:<address>`, or `anonymous`) — there is no separate identity system to configure. Resolution prefers an API-key identity, then a trusted tenant header (with `--trust-tenant-header`), and otherwise falls back to the connection's **TCP peer address** as `ip:<address>`; it never reads proxy headers like `X-Forwarded-For`. Behind a reverse proxy or load balancer that peer address is the proxy's, so every unauthenticated caller collapses into one `ip:<proxy-address>` tenant sharing a single budget — per-caller limits there need API keys or a trusted tenant header instead.
 
 See the [reference page](../../reference/tenant-rate-limiting.md) for the exact YAML shape and validation rules.
 
