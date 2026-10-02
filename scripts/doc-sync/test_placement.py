@@ -58,6 +58,36 @@ class PlacementTests(unittest.TestCase):
         item["placement"]["new_page_reason"] = "A distinct reader task; the examined reference covers another task."
         self.assertEqual(len(docs.plan(json.dumps({"concerns": [item]}), self.context())), 1)
 
+    def test_existing_page_explanation_survives_discovery_and_publisher_validation(self):
+        # Both failed scans in run 36741513800 explained why no new page was needed.
+        item = {**self.item, "placement": {**self.item["placement"],
+                "new_page_reason": "No new page. Extend the existing canonical reference."}}
+        context = {**self.context(), "base_sha": self.base, "discovery_shard": "deploy-config"}
+        raw = json.dumps({"concerns": [item], "inspected_commits": [self.base],
+                          "remaining_work": "No remaining candidates."})
+        scan = discovery.validate_scan(raw, context, "deploy-config", context["code_history"])
+        with patch.object(discovery, "partition", return_value={}):
+            selected, deferred = discovery.combine([scan], context)
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(deferred, [])
+        bundle = json.dumps({"base_sha": self.base, "key": item["key"],
+                             "files": {str(self.path): "Corrected existing reference.\n"}})
+        self.assertTrue(docs.import_bundle(selected[0], self.base, bundle))
+        self.assertTrue(docs.validate_diff(selected[0], self.base))
+
+    def test_existing_page_reason_still_requires_bounded_text(self):
+        for reason in [None, 42, {}, "x" * 4001]:
+            item = {**self.item, "placement": {**self.item["placement"], "new_page_reason": reason}}
+            with self.subTest(reason_type=type(reason).__name__), self.assertRaisesRegex(
+                    ValueError, "Invalid new-page justification"):
+                docs.plan(json.dumps({"concerns": [item]}), self.context())
+
+    def test_existing_page_explanation_does_not_override_canonical_paths(self):
+        item = {**self.item, "placement": {**self.item["placement"],
+                "canonical_pages": [], "new_page_reason": "No new page. Existing reference only."}}
+        with self.assertRaisesRegex(ValueError, "Canonical pages"):
+            docs.plan(json.dumps({"concerns": [item]}), self.context())
+
     def test_writer_and_fresh_publisher_reject_new_page_without_canonical_edit(self):
         new = self.path.parent / "new.md"
         item = {**self.item, "doc_paths": [str(self.path), str(new)],
