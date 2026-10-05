@@ -161,7 +161,7 @@ HTTP vLLM workers report none of the MoRI-IO settings, so set them as worker lab
 | `moriio_handshake_port` | `6301` | The engine's `handshake_port` |
 | `moriio_notify_port` | `61005` | The engine's `notify_port` |
 | `moriio_write_dispatch` | `sequential` | `sequential` or `concurrent`: whether SMG sends the two WRITE legs one after the other or at once. Honored on the decode worker; a READ pair stays sequential. Any other value on either worker refuses the pair |
-| `tp_size` | Unset: both legs have the same TP | The decode engine's tensor-parallel size, sent to the prefill as `remote_tp_size`. Under concurrent dispatch, the prefill worker's value is likewise sent to the decode leg. With vLLM `0.30.1rc1.dev396+gac68c3087`, a TP4 prefill with a TP8 decode worked in READ mode, but in WRITE mode the decode request never completed, through vllm-router as well: only half of the decode ranks received KV (vllm-project/vllm#60101) |
+| `tp_size` | Unset: both legs have the same TP | The decode engine's tensor-parallel size, sent to the prefill as `remote_tp_size`. Under concurrent dispatch, the prefill worker's value is likewise sent to the decode leg. With vLLM `0.30.1rc1.dev396+gac68c3087`, a TP4 prefill with a TP8 decode worked in READ mode, but in WRITE mode the decode request never completed, through vllm-router as well: only half of the decode ranks received KV (vllm-project/vllm#60101). Until that is fixed, use READ mode or the same TP on both engines |
 
 ```bash
 curl -X POST http://localhost:30000/workers \
